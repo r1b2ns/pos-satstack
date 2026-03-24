@@ -43,6 +43,12 @@ class BdkWalletRepository @Inject constructor(
 
     override suspend fun createWallet(network: WalletNetwork): WalletDescriptor =
         withContext(Dispatchers.IO) {
+            // BDK throws CreateWithPersistException$DataAlreadyExists if the SQLite file
+            // already contains wallet data. Delete it first so a fresh wallet can be created.
+            wallet = null
+            persister = null
+            File(dbPath).delete()
+
             val bdkNetwork = network.toBdkNetwork()
             val mnemonic = Mnemonic(WordCount.WORDS12)
             val rootKey = DescriptorSecretKey(bdkNetwork, mnemonic, null)

@@ -1,11 +1,70 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">POS SatStack</string>
+
+    <!-- Home -->
     <string name="charge">Charge</string>
     <string name="charge_subtitle">Create a Bitcoin payment request</string>
     <string name="settings">Settings</string>
     <string name="settings_subtitle">Wallet, network and preferences</string>
+
+    <!-- Common -->
     <string name="the_bitcoin_machine">The Bitcoin Machine</string>
     <string name="back">Back</string>
     <string name="coming_soon">Coming soon</string>
+    <string name="confirm">Confirm</string>
+    <string name="cancel">Cancel</string>
+    <string name="copy">Copy</string>
+    <string name="copied">Copied</string>
+    <string name="error">Error</string>
+    <string name="dismiss">Dismiss</string>
+
+    <!-- Settings -->
+    <string name="wallet">Wallet</string>
+    <string name="wallet_settings_subtitle">Create, import or manage your wallet</string>
+
+    <!-- Wallet hub -->
+    <string name="wallet_management">Wallet management</string>
+    <string name="no_wallet_message">No wallet configured. Create or import one to get started.</string>
+
+    <string name="wallet_create">Create new wallet</string>
+    <string name="wallet_create_subtitle">Generate a new Bitcoin wallet with a fresh seed phrase</string>
+    <string name="wallet_create_confirm_title">Create new wallet?</string>
+    <string name="wallet_create_confirm_message">This will replace any existing wallet. Make sure you have backed up your current seed phrase before proceeding.</string>
+
+    <string name="wallet_import">Import wallet</string>
+    <string name="wallet_import_subtitle">Restore a wallet from a 12 or 24-word seed phrase</string>
+
+    <string name="wallet_delete">Delete wallet</string>
+    <string name="wallet_delete_subtitle">Remove the wallet from this device</string>
+    <string name="wallet_delete_confirm_title">Delete wallet?</string>
+    <string name="wallet_delete_confirm_message">This will permanently remove the wallet from this device. This action cannot be undone. Ensure you have your seed phrase backed up.</string>
+
+    <!-- Transactions -->
+    <string name="transactions">Transactions</string>
+
+    <string name="wallet_receive">Receive</string>
+    <string name="wallet_receive_subtitle">Show your Bitcoin address to receive payments</string>
+    <string name="receive_address">Receive address</string>
+    <string name="receive_address_hint">Tap to copy</string>
+    <string name="generate_address">Generate address</string>
+
+    <string name="wallet_send">Send</string>
+    <string name="wallet_send_subtitle">Send Bitcoin to another address</string>
+    <string name="recipient_address">Recipient address</string>
+    <string name="amount_sats">Amount (sats)</string>
+    <string name="send">Send</string>
+
+    <!-- Security -->
+    <string name="security">Security</string>
+
+    <string name="wallet_seed_phrase">View seed phrase</string>
+    <string name="wallet_seed_phrase_subtitle">Show the 12-word backup phrase for this wallet</string>
+    <string name="seed_phrase_warning">Keep these words safe. Anyone with access to your seed phrase has full control of your funds.</string>
+    <string name="seed_phrase_not_available">Seed phrase not available for this wallet.</string>
+
+    <!-- Import -->
+    <string name="enter_seed_phrase">Enter seed phrase</string>
+    <string name="enter_seed_phrase_hint">Enter your 12 or 24 words separated by spaces</string>
+    <string name="import_wallet">Import wallet</string>
 </resources>

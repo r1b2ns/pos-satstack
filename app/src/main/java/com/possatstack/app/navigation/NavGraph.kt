@@ -1,5 +1,6 @@
 package com.possatstack.app.navigation
 
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.CenterAlignedTopAppBar
@@ -8,7 +9,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -21,6 +21,11 @@ import com.possatstack.app.R
 import com.possatstack.app.ui.charge.ChargeScreen
 import com.possatstack.app.ui.home.HomeScreen
 import com.possatstack.app.ui.settings.SettingsScreen
+import com.possatstack.app.ui.wallet.WalletScreen
+import com.possatstack.app.ui.wallet.import.WalletImportScreen
+import com.possatstack.app.ui.wallet.receive.WalletReceiveScreen
+import com.possatstack.app.ui.wallet.seedphrase.WalletSeedPhraseScreen
+import com.possatstack.app.ui.wallet.send.WalletSendScreen
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -55,17 +60,49 @@ fun AppNavGraph(navController: NavHostController) {
             composable<AppDestination.Home> {
                 HomeScreen(
                     onMenuEntryClick = { destination ->
-                        navController.navigate(destination) {
-                            launchSingleTop = true
-                        }
+                        navController.navigate(destination) { launchSingleTop = true }
                     },
                 )
             }
+
             composable<AppDestination.Charge> {
                 ChargeScreen()
             }
+
             composable<AppDestination.Settings> {
-                SettingsScreen()
+                SettingsScreen(
+                    onNavigate = { destination ->
+                        navController.navigate(destination) { launchSingleTop = true }
+                    },
+                )
+            }
+
+            // ── Wallet ────────────────────────────────────────────────────────
+
+            composable<AppDestination.Wallet> {
+                WalletScreen(
+                    onNavigate = { destination ->
+                        navController.navigate(destination) { launchSingleTop = true }
+                    },
+                )
+            }
+
+            composable<AppDestination.WalletImport> {
+                WalletImportScreen(
+                    onImported = { navController.popBackStack() },
+                )
+            }
+
+            composable<AppDestination.WalletReceive> {
+                WalletReceiveScreen()
+            }
+
+            composable<AppDestination.WalletSend> {
+                WalletSendScreen()
+            }
+
+            composable<AppDestination.WalletSeedPhrase> {
+                WalletSeedPhraseScreen()
             }
         }
     }
