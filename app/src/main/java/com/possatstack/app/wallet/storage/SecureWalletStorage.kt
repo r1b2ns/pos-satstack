@@ -67,11 +67,19 @@ class SecureWalletStorage @Inject constructor(
         prefs.edit().clear().apply()
     }
 
+    override fun markFullScanDone() {
+        prefs.edit().putBoolean(KEY_FULL_SCAN_DONE, true).apply()
+    }
+
+    override fun isFullScanDone(): Boolean =
+        prefs.getBoolean(KEY_FULL_SCAN_DONE, false)
+
     private companion object {
         const val PREFS_FILE = "wallet_secure_prefs"
         const val KEY_EXTERNAL_DESCRIPTOR = "external_descriptor"
         const val KEY_INTERNAL_DESCRIPTOR = "internal_descriptor"
         const val KEY_NETWORK = "network"
         const val KEY_MNEMONIC = "mnemonic"
+        const val KEY_FULL_SCAN_DONE = "full_scan_done"
     }
 }

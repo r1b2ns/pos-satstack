@@ -10,6 +10,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.bitcoindevkit.Descriptor
 import org.bitcoindevkit.DescriptorSecretKey
+import org.bitcoindevkit.ElectrumClient
 import org.bitcoindevkit.KeychainKind
 import org.bitcoindevkit.Mnemonic
 import org.bitcoindevkit.Network
@@ -137,6 +138,45 @@ class BdkWalletRepository @Inject constructor(
             BitcoinAddress(addressInfo.address.toString())
         }
 
+    override suspend fun syncWallet(network: WalletNetwork, isFullScan: Boolean): Unit =
+        withContext(Dispatchers.IO) {
+            val w = requireNotNull(wallet) {
+                "Wallet not initialised. Call createWallet or loadWallet first."
+            }
+            val p = requireNotNull(persister) {
+                "Persister not initialised. Call createWallet or loadWallet first."
+            }
+
+            val url = network.toElectrumUrl()
+                ?: error("No Electrum server configured for network $network")
+
+            val client = ElectrumClient(url)
+            try {
+                val update = if (isFullScan) {
+                    val request = w.startFullScan().build()
+                    client.fullScan(request, STOP_GAP, BATCH_SIZE, false)
+                } else {
+                    val request = w.startSyncWithRevealedSpks().build()
+                    client.sync(request, BATCH_SIZE, false)
+                }
+                w.applyUpdate(update)
+                w.persist(p)
+            } finally {
+                // ElectrumClient is a Rust-backed object; let the finalizer close the TCP
+                // connection when the reference is released.
+                @Suppress("UnusedExpression")
+                client
+            }
+        }
+
+    override suspend fun getBalance(): Long =
+        withContext(Dispatchers.IO) {
+            val w = requireNotNull(wallet) {
+                "Wallet not initialised. Call createWallet or loadWallet first."
+            }
+            w.balance().total.toSat().toLong()
+        }
+
     private fun WalletNetwork.toBdkNetwork(): Network =
         when (this) {
             WalletNetwork.MAINNET -> Network.BITCOIN
@@ -145,7 +185,21 @@ class BdkWalletRepository @Inject constructor(
             WalletNetwork.REGTEST -> Network.REGTEST
         }
 
+    /** Returns the Electrum SSL URL for the given network, or null if not supported. */
+    private fun WalletNetwork.toElectrumUrl(): String? =
+        when (this) {
+            WalletNetwork.SIGNET -> "ssl://mempool.space:60602"
+            WalletNetwork.MAINNET -> "ssl://electrum.blockstream.info:50002"
+            else -> null
+        }
+
     private companion object {
         const val DB_FILE_NAME = "bdk_wallet.sqlite3"
+
+        /** Gap limit: number of consecutive unused addresses before stopping the scan. */
+        const val STOP_GAP = 20UL
+
+        /** Number of script public keys per Electrum batch request. */
+        const val BATCH_SIZE = 10UL
     }
 }

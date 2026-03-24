@@ -1,25 +1,36 @@
 package com.possatstack.app.ui.wallet
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.CallMade
-import androidx.compose.material.icons.filled.CallReceived
+import androidx.compose.material.icons.automirrored.filled.CallMade
+import androidx.compose.material.icons.automirrored.filled.CallReceived
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Key
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
@@ -39,11 +50,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.possatstack.app.R
 import com.possatstack.app.navigation.AppDestination
+import com.possatstack.app.wallet.SyncProgress
 
 @Composable
 fun WalletScreen(
@@ -69,7 +82,15 @@ fun WalletScreen(
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState()),
         ) {
-            if (!state.hasWallet) {
+            // ── Balance card ──────────────────────────────────────────────────
+            if (state.hasWallet) {
+                BalanceCard(
+                    balanceSats = state.balanceSats,
+                    isSyncing = state.syncProgress != SyncProgress.Idle,
+                    onSyncClick = { viewModel.syncWallet() },
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                )
+            } else {
                 Text(
                     text = stringResource(R.string.no_wallet_message),
                     style = MaterialTheme.typography.bodyMedium,
@@ -96,23 +117,13 @@ fun WalletScreen(
                 subtitle = stringResource(R.string.wallet_import_subtitle),
                 onClick = { onNavigate(AppDestination.WalletImport) },
             )
-            HorizontalDivider(modifier = Modifier.padding(start = 72.dp))
-
-            WalletListItem(
-                icon = Icons.Default.Delete,
-                title = stringResource(R.string.wallet_delete),
-                subtitle = stringResource(R.string.wallet_delete_subtitle),
-                enabled = state.hasWallet,
-                isDestructive = true,
-                onClick = { showDeleteDialog = true },
-            )
 
             // ── Transactions ──────────────────────────────────────────────────
 
             SectionHeader(stringResource(R.string.transactions))
 
             WalletListItem(
-                icon = Icons.Default.CallReceived,
+                icon = Icons.AutoMirrored.Filled.CallReceived,
                 title = stringResource(R.string.wallet_receive),
                 subtitle = stringResource(R.string.wallet_receive_subtitle),
                 enabled = state.hasWallet,
@@ -121,7 +132,7 @@ fun WalletScreen(
             HorizontalDivider(modifier = Modifier.padding(start = 72.dp))
 
             WalletListItem(
-                icon = Icons.Default.CallMade,
+                icon = Icons.AutoMirrored.Filled.CallMade,
                 title = stringResource(R.string.wallet_send),
                 subtitle = stringResource(R.string.wallet_send_subtitle),
                 enabled = state.hasWallet,
@@ -140,6 +151,19 @@ fun WalletScreen(
                 onClick = { onNavigate(AppDestination.WalletSeedPhrase) },
             )
 
+            // ── Danger zone ───────────────────────────────────────────────────
+
+            SectionHeader(stringResource(R.string.danger_zone))
+
+            WalletListItem(
+                icon = Icons.Default.Delete,
+                title = stringResource(R.string.wallet_delete),
+                subtitle = stringResource(R.string.wallet_delete_subtitle),
+                enabled = state.hasWallet,
+                isDestructive = true,
+                onClick = { showDeleteDialog = true },
+            )
+
             if (state.isLoading) {
                 Column(
                     modifier = Modifier
@@ -152,6 +176,15 @@ fun WalletScreen(
                 }
             }
         }
+
+        // ── Sync progress toast ───────────────────────────────────────────────
+
+        SyncProgressToast(
+            progress = state.syncProgress,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 72.dp),
+        )
 
         SnackbarHost(
             hostState = snackbarHostState,
@@ -213,6 +246,133 @@ fun WalletScreen(
 }
 
 // ── Private components ────────────────────────────────────────────────────────
+
+@Composable
+private fun BalanceCard(
+    balanceSats: Long?,
+    isSyncing: Boolean,
+    onSyncClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer,
+        ),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = if (balanceSats != null) {
+                        stringResource(R.string.balance_btc, balanceSats / 100_000_000.0)
+                    } else {
+                        stringResource(R.string.balance_unknown)
+                    },
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontFamily = FontFamily.Monospace,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                )
+                IconButton(
+                    onClick = onSyncClick,
+                    enabled = !isSyncing,
+                ) {
+                    if (isSyncing) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = stringResource(R.string.sync_wallet),
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                        )
+                    }
+                }
+            }
+            if (balanceSats != null) {
+                Text(
+                    text = stringResource(R.string.balance_sats, balanceSats),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
+                    modifier = Modifier.align(Alignment.Start),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SyncProgressToast(
+    progress: SyncProgress,
+    modifier: Modifier = Modifier,
+) {
+    AnimatedVisibility(
+        visible = progress != SyncProgress.Idle,
+        enter = slideInVertically { it / 2 } + fadeIn(),
+        exit = slideOutVertically { it / 2 } + fadeOut(),
+        modifier = modifier,
+    ) {
+        Card(
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.inverseSurface,
+            ),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp),
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                when (progress) {
+                    is SyncProgress.FullScan -> {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.inverseOnSurface,
+                        )
+                        Text(
+                            text = stringResource(R.string.sync_full_scan),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.inverseOnSurface,
+                        )
+                    }
+
+                    is SyncProgress.Syncing -> {
+                        CircularProgressIndicator(
+                            progress = { progress.percent / 100f },
+                            modifier = Modifier.size(20.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.inverseOnSurface,
+                            trackColor = MaterialTheme.colorScheme.inverseSurface,
+                        )
+                        Text(
+                            text = stringResource(R.string.sync_in_progress, progress.percent),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.inverseOnSurface,
+                        )
+                    }
+
+                    SyncProgress.Idle -> { /* hidden by AnimatedVisibility */ }
+                }
+            }
+        }
+    }
+}
 
 @Composable
 private fun SectionHeader(title: String, modifier: Modifier = Modifier) {
