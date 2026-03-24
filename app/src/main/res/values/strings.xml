@@ -5,4 +5,6 @@
     <string name="charge_subtitle">Create a Bitcoin payment request</string>
     <string name="settings">Settings</string>
     <string name="settings_subtitle">Wallet, network and preferences</string>
+    <string name="back">Back</string>
+    <string name="coming_soon">Coming soon</string>
 </resources>
