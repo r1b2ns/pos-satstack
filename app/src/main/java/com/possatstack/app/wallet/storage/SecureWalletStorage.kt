@@ -2,9 +2,11 @@ package com.possatstack.app.wallet.storage
 
 import android.content.Context
 import androidx.security.crypto.EncryptedSharedPreferences
-import androidx.security.crypto.MasterKeys
+import androidx.security.crypto.MasterKey
 import com.possatstack.app.wallet.WalletDescriptor
 import com.possatstack.app.wallet.WalletNetwork
+import dagger.hilt.android.qualifiers.ApplicationContext
+import javax.inject.Inject
 
 /**
  * [WalletStorage] implementation backed by [EncryptedSharedPreferences].
@@ -16,14 +18,19 @@ import com.possatstack.app.wallet.WalletNetwork
  *
  * This class must not be referenced anywhere outside the DI wiring layer.
  */
-class SecureWalletStorage(context: Context) : WalletStorage {
+class SecureWalletStorage @Inject constructor(
+    @ApplicationContext private val context: Context,
+) : WalletStorage {
 
     private val prefs by lazy {
-        val masterKeyAlias = MasterKeys.getOrCreate(MasterKeys.AES256_GCM_SPEC)
+        val masterKey = MasterKey.Builder(context)
+            .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+            .build()
+
         EncryptedSharedPreferences.create(
+            context,
             PREFS_FILE,
-            masterKeyAlias,
-            context.applicationContext,
+            masterKey,
             EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
             EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
         )
@@ -34,6 +41,9 @@ class SecureWalletStorage(context: Context) : WalletStorage {
             .putString(KEY_EXTERNAL_DESCRIPTOR, descriptor.externalDescriptor)
             .putString(KEY_INTERNAL_DESCRIPTOR, descriptor.internalDescriptor)
             .putString(KEY_NETWORK, descriptor.network.name)
+            .apply {
+                descriptor.mnemonic?.let { putString(KEY_MNEMONIC, it) }
+            }
             .apply()
     }
 
@@ -43,11 +53,13 @@ class SecureWalletStorage(context: Context) : WalletStorage {
         val network = prefs.getString(KEY_NETWORK, null)
             ?.let { runCatching { WalletNetwork.valueOf(it) }.getOrNull() }
             ?: return null
+        val mnemonic = prefs.getString(KEY_MNEMONIC, null)
 
         return WalletDescriptor(
             externalDescriptor = external,
             internalDescriptor = internal,
             network = network,
+            mnemonic = mnemonic,
         )
     }
 
@@ -60,5 +72,6 @@ class SecureWalletStorage(context: Context) : WalletStorage {
         const val KEY_EXTERNAL_DESCRIPTOR = "external_descriptor"
         const val KEY_INTERNAL_DESCRIPTOR = "internal_descriptor"
         const val KEY_NETWORK = "network"
+        const val KEY_MNEMONIC = "mnemonic"
     }
 }

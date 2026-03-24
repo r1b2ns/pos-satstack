@@ -8,8 +8,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -20,18 +22,13 @@ import com.possatstack.app.ui.charge.ChargeScreen
 import com.possatstack.app.ui.home.HomeScreen
 import com.possatstack.app.ui.settings.SettingsScreen
 
-sealed class Screen(val route: String) {
-    data object Home : Screen("home")
-    data object Charge : Screen("charge")
-    data object Settings : Screen("settings")
-}
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AppNavGraph(navController: NavHostController) {
-    val backStackEntry by navController.currentBackStackEntryAsState()
-    val currentRoute = backStackEntry?.destination?.route
-    val canNavigateBack = currentRoute != Screen.Home.route
+    // Observe backstack so canNavigateBack triggers recomposition on navigation events
+    @Suppress("UNUSED_VARIABLE")
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val canNavigateBack = navController.previousBackStackEntry != null
 
     Scaffold(
         topBar = {
@@ -52,20 +49,23 @@ fun AppNavGraph(navController: NavHostController) {
     ) { innerPadding ->
         NavHost(
             navController = navController,
-            startDestination = Screen.Home.route,
+            startDestination = AppDestination.Home,
+            modifier = Modifier.padding(innerPadding),
         ) {
-            composable(Screen.Home.route) {
+            composable<AppDestination.Home> {
                 HomeScreen(
-                    innerPadding = innerPadding,
-                    onChargeClick = { navController.navigate(Screen.Charge.route) },
-                    onSettingsClick = { navController.navigate(Screen.Settings.route) },
+                    onMenuEntryClick = { destination ->
+                        navController.navigate(destination) {
+                            launchSingleTop = true
+                        }
+                    },
                 )
             }
-            composable(Screen.Charge.route) {
-                ChargeScreen(innerPadding = innerPadding)
+            composable<AppDestination.Charge> {
+                ChargeScreen()
             }
-            composable(Screen.Settings.route) {
-                SettingsScreen(innerPadding = innerPadding)
+            composable<AppDestination.Settings> {
+                SettingsScreen()
             }
         }
     }

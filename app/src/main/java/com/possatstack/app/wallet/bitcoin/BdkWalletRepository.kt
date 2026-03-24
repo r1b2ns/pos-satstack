@@ -14,6 +14,7 @@ import org.bitcoindevkit.Network
 import org.bitcoindevkit.Persister
 import org.bitcoindevkit.Wallet
 import org.bitcoindevkit.WordCount
+import javax.inject.Inject
 
 /**
  * BDK 2.x implementation of [WalletRepository].
@@ -24,7 +25,7 @@ import org.bitcoindevkit.WordCount
  * This class must not be referenced anywhere outside the DI wiring layer —
  * all other code must depend on [WalletRepository] only.
  */
-class BdkWalletRepository : WalletRepository {
+class BdkWalletRepository @Inject constructor() : WalletRepository {
 
     private var wallet: Wallet? = null
 
@@ -41,6 +42,7 @@ class BdkWalletRepository : WalletRepository {
                 externalDescriptor = externalDescriptor.toStringWithSecret(),
                 internalDescriptor = internalDescriptor.toStringWithSecret(),
                 network = network,
+                mnemonic = mnemonic.toString(),
             )
 
             initWallet(descriptor)
