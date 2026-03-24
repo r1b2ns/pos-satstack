@@ -21,6 +21,14 @@ interface WalletRepository {
     suspend fun loadWallet(descriptor: WalletDescriptor)
 
     /**
+     * Restores a wallet from a BIP-39 mnemonic phrase (12 or 24 words).
+     * Derives BIP-84 (native SegWit) descriptors, wipes any existing SQLite
+     * data, and initialises the wallet in memory.
+     * Throws [org.bitcoindevkit.Bip39Exception] if the mnemonic is invalid.
+     */
+    suspend fun importWallet(mnemonic: String, network: WalletNetwork): WalletDescriptor
+
+    /**
      * Derives and returns the next unused receive address.
      */
     suspend fun getNewReceiveAddress(): BitcoinAddress

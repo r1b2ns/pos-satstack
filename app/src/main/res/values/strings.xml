@@ -67,4 +67,5 @@
     <string name="enter_seed_phrase">Enter seed phrase</string>
     <string name="enter_seed_phrase_hint">Enter your 12 or 24 words separated by spaces</string>
     <string name="import_wallet">Import wallet</string>
+    <string name="paste">Paste</string>
 </resources>
