@@ -69,8 +69,14 @@ class WalletViewModel @Inject constructor(
     fun importWallet(mnemonic: String) {
         viewModelScope.launch {
             _state.update { it.copy(isLoading = true) }
-            // TODO: derive descriptors from mnemonic via WalletRepository
-            _state.update { it.copy(isLoading = false, errorMessage = "Import not yet implemented") }
+            runCatching { walletRepository.importWallet(mnemonic, WalletNetwork.SIGNET) }
+                .onSuccess { descriptor ->
+                    walletStorage.save(descriptor)
+                    _state.update { it.copy(isLoading = false, hasWallet = true) }
+                }
+                .onFailure { e ->
+                    _state.update { it.copy(isLoading = false, errorMessage = e.message) }
+                }
         }
     }
 

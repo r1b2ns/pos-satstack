@@ -16,6 +16,7 @@ import org.bitcoindevkit.Network
 import org.bitcoindevkit.Persister
 import org.bitcoindevkit.Wallet
 import org.bitcoindevkit.WordCount
+import org.bitcoindevkit.Bip39Exception
 import java.io.File
 import javax.inject.Inject
 
@@ -61,6 +62,41 @@ class BdkWalletRepository @Inject constructor(
                 internalDescriptor = internalDescriptor.toStringWithSecret(),
                 network = network,
                 mnemonic = mnemonic.toString(),
+            )
+
+            val p = Persister.newSqlite(dbPath)
+            wallet = Wallet(
+                descriptor = Descriptor(descriptor.externalDescriptor, bdkNetwork),
+                changeDescriptor = Descriptor(descriptor.internalDescriptor, bdkNetwork),
+                network = bdkNetwork,
+                persister = p,
+            )
+            persister = p
+            descriptor
+        }
+
+    /**
+     * @throws Bip39Exception if [mnemonic] contains invalid or unknown words.
+     */
+    override suspend fun importWallet(mnemonic: String, network: WalletNetwork): WalletDescriptor =
+        withContext(Dispatchers.IO) {
+            // Wipe existing SQLite file so the new wallet can be persisted cleanly.
+            wallet = null
+            persister = null
+            File(dbPath).delete()
+
+            val bdkNetwork = network.toBdkNetwork()
+            val parsedMnemonic = Mnemonic.fromString(mnemonic) // throws Bip39Exception if invalid
+            val rootKey = DescriptorSecretKey(bdkNetwork, parsedMnemonic, null)
+
+            val externalDescriptor = Descriptor.newBip84(rootKey, KeychainKind.EXTERNAL, bdkNetwork)
+            val internalDescriptor = Descriptor.newBip84(rootKey, KeychainKind.INTERNAL, bdkNetwork)
+
+            val descriptor = WalletDescriptor(
+                externalDescriptor = externalDescriptor.toStringWithSecret(),
+                internalDescriptor = internalDescriptor.toStringWithSecret(),
+                network = network,
+                mnemonic = mnemonic,
             )
 
             val p = Persister.newSqlite(dbPath)

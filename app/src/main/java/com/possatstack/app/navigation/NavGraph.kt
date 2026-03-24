@@ -11,8 +11,10 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -22,6 +24,7 @@ import com.possatstack.app.ui.charge.ChargeScreen
 import com.possatstack.app.ui.home.HomeScreen
 import com.possatstack.app.ui.settings.SettingsScreen
 import com.possatstack.app.ui.wallet.WalletScreen
+import com.possatstack.app.ui.wallet.WalletViewModel
 import com.possatstack.app.ui.wallet.import.WalletImportScreen
 import com.possatstack.app.ui.wallet.receive.WalletReceiveScreen
 import com.possatstack.app.ui.wallet.seedphrase.WalletSeedPhraseScreen
@@ -78,6 +81,9 @@ fun AppNavGraph(navController: NavHostController) {
             }
 
             // ── Wallet ────────────────────────────────────────────────────────
+            // All wallet sub-screens share the same WalletViewModel instance,
+            // scoped to the Wallet back stack entry, so state changes (e.g. after
+            // import) are immediately reflected in WalletScreen without a reload.
 
             composable<AppDestination.Wallet> {
                 WalletScreen(
@@ -87,22 +93,35 @@ fun AppNavGraph(navController: NavHostController) {
                 )
             }
 
-            composable<AppDestination.WalletImport> {
+            composable<AppDestination.WalletImport> { backStackEntry ->
+                val walletEntry = remember(backStackEntry) {
+                    navController.getBackStackEntry<AppDestination.Wallet>()
+                }
+                val viewModel: WalletViewModel = hiltViewModel(walletEntry)
                 WalletImportScreen(
                     onImported = { navController.popBackStack() },
+                    viewModel = viewModel,
                 )
             }
 
-            composable<AppDestination.WalletReceive> {
-                WalletReceiveScreen()
+            composable<AppDestination.WalletReceive> { backStackEntry ->
+                val walletEntry = remember(backStackEntry) {
+                    navController.getBackStackEntry<AppDestination.Wallet>()
+                }
+                val viewModel: WalletViewModel = hiltViewModel(walletEntry)
+                WalletReceiveScreen(viewModel = viewModel)
             }
 
             composable<AppDestination.WalletSend> {
                 WalletSendScreen()
             }
 
-            composable<AppDestination.WalletSeedPhrase> {
-                WalletSeedPhraseScreen()
+            composable<AppDestination.WalletSeedPhrase> { backStackEntry ->
+                val walletEntry = remember(backStackEntry) {
+                    navController.getBackStackEntry<AppDestination.Wallet>()
+                }
+                val viewModel: WalletViewModel = hiltViewModel(walletEntry)
+                WalletSeedPhraseScreen(viewModel = viewModel)
             }
         }
     }
