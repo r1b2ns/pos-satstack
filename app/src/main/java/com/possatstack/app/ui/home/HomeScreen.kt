@@ -3,13 +3,16 @@ package com.possatstack.app.ui.home
 import android.content.res.Configuration.UI_MODE_NIGHT_YES
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CurrencyBitcoin
 import androidx.compose.material.icons.filled.Settings
@@ -53,26 +56,32 @@ sealed class HomeDestination(
 
 @Composable
 fun HomeScreen(
+    innerPadding: PaddingValues = PaddingValues(),
     onChargeClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
 ) {
-    Row(
-        modifier =
-            Modifier
-                .fillMaxSize()
-                .padding(16.dp),
+    val items = listOf(
+        HomeDestination.Charge to onChargeClick,
+        HomeDestination.Settings to onSettingsClick,
+    )
+
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(2),
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(innerPadding),
+        contentPadding = PaddingValues(
+            start = 16.dp,
+            end = 16.dp,
+            top = 16.dp,
+            bottom = 32.dp,
+        ),
         horizontalArrangement = Arrangement.spacedBy(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        MenuCard(
-            destination = HomeDestination.Charge,
-            onClick = onChargeClick,
-            modifier = Modifier.weight(1f),
-        )
-        MenuCard(
-            destination = HomeDestination.Settings,
-            onClick = onSettingsClick,
-            modifier = Modifier.weight(1f),
-        )
+        items(items) { (destination, onClick) ->
+            MenuCard(destination = destination, onClick = onClick)
+        }
     }
 }
 
