@@ -13,9 +13,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CurrencyBitcoin
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -24,52 +21,21 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.possatstack.app.R
-import com.possatstack.app.ui.theme.BitcoinOrange
+import com.possatstack.app.navigation.AppDestination
+import com.possatstack.app.navigation.HomeMenuEntry
 import com.possatstack.app.ui.theme.PosTheme
-
-sealed class HomeDestination(
-    val titleRes: Int,
-    val subtitleRes: Int,
-    val icon: ImageVector,
-    val iconTint: Color? = null,
-) {
-    data object Charge : HomeDestination(
-        titleRes = R.string.charge,
-        subtitleRes = R.string.charge_subtitle,
-        icon = Icons.Default.CurrencyBitcoin,
-        iconTint = BitcoinOrange,
-    )
-
-    data object Settings : HomeDestination(
-        titleRes = R.string.settings,
-        subtitleRes = R.string.settings_subtitle,
-        icon = Icons.Default.Settings,
-    )
-}
 
 @Composable
 fun HomeScreen(
-    innerPadding: PaddingValues = PaddingValues(),
-    onChargeClick: () -> Unit = {},
-    onSettingsClick: () -> Unit = {},
+    onMenuEntryClick: (AppDestination) -> Unit = {},
 ) {
-    val items = listOf(
-        HomeDestination.Charge to onChargeClick,
-        HomeDestination.Settings to onSettingsClick,
-    )
-
     LazyVerticalGrid(
         columns = GridCells.Fixed(2),
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(innerPadding),
+        modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(
             start = 16.dp,
             end = 16.dp,
@@ -79,49 +45,50 @@ fun HomeScreen(
         horizontalArrangement = Arrangement.spacedBy(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        items(items) { (destination, onClick) ->
-            MenuCard(destination = destination, onClick = onClick)
+        items(HomeMenuEntry.all) { entry ->
+            MenuCard(
+                entry = entry,
+                onClick = { onMenuEntryClick(entry.destination) },
+            )
         }
     }
 }
 
 @Composable
 private fun MenuCard(
-    destination: HomeDestination,
+    entry: HomeMenuEntry,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Card(
         onClick = onClick,
-        colors =
-            CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.primaryContainer,
-            ),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer,
+        ),
         modifier = modifier.fillMaxWidth(),
     ) {
         Column(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
             Icon(
-                imageVector = destination.icon,
-                contentDescription = stringResource(destination.titleRes),
+                imageVector = entry.icon,
+                contentDescription = stringResource(entry.titleRes),
                 modifier = Modifier.size(48.dp),
-                tint = destination.iconTint ?: MaterialTheme.colorScheme.onPrimaryContainer,
+                tint = entry.iconTint ?: MaterialTheme.colorScheme.onPrimaryContainer,
             )
             Spacer(modifier = Modifier.height(12.dp))
             Text(
-                text = stringResource(destination.titleRes),
+                text = stringResource(entry.titleRes),
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onPrimaryContainer,
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = stringResource(destination.subtitleRes),
+                text = stringResource(entry.subtitleRes),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
                 textAlign = TextAlign.Center,
@@ -146,6 +113,6 @@ private fun HomeScreenDarkPreview() {
 @Composable
 private fun MenuCardChargePreview() {
     PosTheme {
-        MenuCard(destination = HomeDestination.Charge, onClick = {})
+        MenuCard(entry = HomeMenuEntry.Charge, onClick = {})
     }
 }
