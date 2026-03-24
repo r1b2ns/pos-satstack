@@ -63,6 +63,19 @@
     <string name="seed_phrase_warning">Keep these words safe. Anyone with access to your seed phrase has full control of your funds.</string>
     <string name="seed_phrase_not_available">Seed phrase not available for this wallet.</string>
 
+    <!-- Danger zone -->
+    <string name="danger_zone">Danger zone</string>
+
+    <!-- Sync -->
+    <string name="sync_full_scan">Scanning blockchain…</string>
+    <string name="sync_in_progress">Syncing… %1$d%%</string>
+
+    <!-- Balance -->
+    <string name="balance_btc">%1$.8f BTC</string>
+    <string name="balance_sats">%1$d sats</string>
+    <string name="balance_unknown">— BTC</string>
+    <string name="sync_wallet">Sync</string>
+
     <!-- Import -->
     <string name="enter_seed_phrase">Enter seed phrase</string>
     <string name="enter_seed_phrase_hint">Enter your 12 or 24 words separated by spaces</string>

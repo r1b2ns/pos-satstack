@@ -32,4 +32,22 @@ interface WalletRepository {
      * Derives and returns the next unused receive address.
      */
     suspend fun getNewReceiveAddress(): BitcoinAddress
+
+    /**
+     * Synchronises the wallet with the network via Electrum.
+     *
+     * Pass [isFullScan] = true for an initial scan of all script public keys
+     * (slower, used when the wallet has never been synced before).
+     * Pass false for an incremental sync of already-revealed addresses (faster).
+     *
+     * Throws [org.bitcoindevkit.ElectrumException] on connection failure.
+     * Throws [IllegalStateException] if the wallet has not been initialised.
+     */
+    suspend fun syncWallet(network: WalletNetwork, isFullScan: Boolean)
+
+    /**
+     * Returns the wallet balance in satoshis (confirmed + trusted pending).
+     * Throws [IllegalStateException] if the wallet has not been initialised.
+     */
+    suspend fun getBalance(): Long
 }

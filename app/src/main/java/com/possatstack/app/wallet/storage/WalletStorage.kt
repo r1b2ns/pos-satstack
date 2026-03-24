@@ -27,6 +27,21 @@ interface WalletStorage {
     /**
      * Removes all stored wallet data. Use with caution — this is irreversible
      * unless the user has an external backup of their seed phrase.
+     * Also resets the full-scan flag so the next wallet load triggers a new
+     * full scan.
      */
     fun clear()
+
+    /**
+     * Records that at least one full Electrum scan has been completed for
+     * the current wallet. After this is called, subsequent syncs will use
+     * the faster incremental sync path.
+     */
+    fun markFullScanDone()
+
+    /**
+     * Returns true if [markFullScanDone] has been called for the current
+     * wallet, false otherwise (fresh wallet or after [clear]).
+     */
+    fun isFullScanDone(): Boolean
 }
