@@ -8,6 +8,8 @@ import com.possatstack.app.wallet.WalletNetwork
 import com.possatstack.app.wallet.WalletRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.bitcoindevkit.Bip39Exception
 import org.bitcoindevkit.Descriptor
@@ -30,6 +32,10 @@ import javax.inject.Inject
  * The [Persister] reference is retained alongside the [Wallet] so that state
  * changes (e.g. new revealed addresses) are flushed to disk after each operation.
  *
+ * A [Mutex] serialises all wallet operations so that concurrent callers
+ * (e.g. [WalletSyncService] and [WalletViewModel]) never access the underlying
+ * BDK wallet object simultaneously.
+ *
  * This class must not be referenced anywhere outside the DI wiring layer —
  * all other code must depend on [WalletRepository] only.
  */
@@ -37,6 +43,7 @@ class BdkWalletRepository @Inject constructor(
     @ApplicationContext private val context: Context,
 ) : WalletRepository {
 
+    private val mutex = Mutex()
     private var wallet: Wallet? = null
     private var persister: Persister? = null
 
@@ -46,37 +53,39 @@ class BdkWalletRepository @Inject constructor(
 
     override suspend fun createWallet(network: WalletNetwork): WalletDescriptor =
         withContext(Dispatchers.IO) {
-            AppLogger.info(TAG, "Creating new wallet (network=$network)")
-            // BDK throws CreateWithPersistException$DataAlreadyExists if the SQLite file
-            // already contains wallet data. Delete it first so a fresh wallet can be created.
-            wallet = null
-            persister = null
-            File(dbPath).delete()
+            mutex.withLock {
+                AppLogger.info(TAG, "Creating new wallet (network=$network)")
+                // BDK throws CreateWithPersistException$DataAlreadyExists if the SQLite file
+                // already contains wallet data. Delete it first so a fresh wallet can be created.
+                wallet = null
+                persister = null
+                File(dbPath).delete()
 
-            val bdkNetwork = network.toBdkNetwork()
-            val mnemonic = Mnemonic(WordCount.WORDS12)
-            val rootKey = DescriptorSecretKey(bdkNetwork, mnemonic, null)
+                val bdkNetwork = network.toBdkNetwork()
+                val mnemonic = Mnemonic(WordCount.WORDS12)
+                val rootKey = DescriptorSecretKey(bdkNetwork, mnemonic, null)
 
-            val externalDescriptor = Descriptor.newBip84(rootKey, KeychainKind.EXTERNAL, bdkNetwork)
-            val internalDescriptor = Descriptor.newBip84(rootKey, KeychainKind.INTERNAL, bdkNetwork)
+                val externalDescriptor = Descriptor.newBip84(rootKey, KeychainKind.EXTERNAL, bdkNetwork)
+                val internalDescriptor = Descriptor.newBip84(rootKey, KeychainKind.INTERNAL, bdkNetwork)
 
-            val descriptor = WalletDescriptor(
-                externalDescriptor = externalDescriptor.toStringWithSecret(),
-                internalDescriptor = internalDescriptor.toStringWithSecret(),
-                network = network,
-                mnemonic = mnemonic.toString(),
-            )
+                val descriptor = WalletDescriptor(
+                    externalDescriptor = externalDescriptor.toStringWithSecret(),
+                    internalDescriptor = internalDescriptor.toStringWithSecret(),
+                    network = network,
+                    mnemonic = mnemonic.toString(),
+                )
 
-            val p = Persister.newSqlite(dbPath)
-            wallet = Wallet(
-                descriptor = Descriptor(descriptor.externalDescriptor, bdkNetwork),
-                changeDescriptor = Descriptor(descriptor.internalDescriptor, bdkNetwork),
-                network = bdkNetwork,
-                persister = p,
-            )
-            persister = p
-            AppLogger.info(TAG, "Wallet created successfully")
-            descriptor
+                val p = Persister.newSqlite(dbPath)
+                wallet = Wallet(
+                    descriptor = Descriptor(descriptor.externalDescriptor, bdkNetwork),
+                    changeDescriptor = Descriptor(descriptor.internalDescriptor, bdkNetwork),
+                    network = bdkNetwork,
+                    persister = p,
+                )
+                persister = p
+                AppLogger.info(TAG, "Wallet created successfully")
+                descriptor
+            }
         }
 
     /**
@@ -84,126 +93,140 @@ class BdkWalletRepository @Inject constructor(
      */
     override suspend fun importWallet(mnemonic: String, network: WalletNetwork): WalletDescriptor =
         withContext(Dispatchers.IO) {
-            AppLogger.info(TAG, "Importing wallet (network=$network)")
-            // Wipe existing SQLite file so the new wallet can be persisted cleanly.
-            wallet = null
-            persister = null
-            File(dbPath).delete()
+            mutex.withLock {
+                AppLogger.info(TAG, "Importing wallet (network=$network)")
+                // Wipe existing SQLite file so the new wallet can be persisted cleanly.
+                wallet = null
+                persister = null
+                File(dbPath).delete()
 
-            val bdkNetwork = network.toBdkNetwork()
-            val parsedMnemonic = Mnemonic.fromString(mnemonic) // throws Bip39Exception if invalid
-            val rootKey = DescriptorSecretKey(bdkNetwork, parsedMnemonic, null)
+                val bdkNetwork = network.toBdkNetwork()
+                val parsedMnemonic = Mnemonic.fromString(mnemonic) // throws Bip39Exception if invalid
+                val rootKey = DescriptorSecretKey(bdkNetwork, parsedMnemonic, null)
 
-            val externalDescriptor = Descriptor.newBip84(rootKey, KeychainKind.EXTERNAL, bdkNetwork)
-            val internalDescriptor = Descriptor.newBip84(rootKey, KeychainKind.INTERNAL, bdkNetwork)
+                val externalDescriptor = Descriptor.newBip84(rootKey, KeychainKind.EXTERNAL, bdkNetwork)
+                val internalDescriptor = Descriptor.newBip84(rootKey, KeychainKind.INTERNAL, bdkNetwork)
 
-            val descriptor = WalletDescriptor(
-                externalDescriptor = externalDescriptor.toStringWithSecret(),
-                internalDescriptor = internalDescriptor.toStringWithSecret(),
-                network = network,
-                mnemonic = mnemonic,
-            )
+                val descriptor = WalletDescriptor(
+                    externalDescriptor = externalDescriptor.toStringWithSecret(),
+                    internalDescriptor = internalDescriptor.toStringWithSecret(),
+                    network = network,
+                    mnemonic = mnemonic,
+                )
 
-            val p = Persister.newSqlite(dbPath)
-            wallet = Wallet(
-                descriptor = Descriptor(descriptor.externalDescriptor, bdkNetwork),
-                changeDescriptor = Descriptor(descriptor.internalDescriptor, bdkNetwork),
-                network = bdkNetwork,
-                persister = p,
-            )
-            persister = p
-            AppLogger.info(TAG, "Wallet imported successfully")
-            descriptor
+                val p = Persister.newSqlite(dbPath)
+                wallet = Wallet(
+                    descriptor = Descriptor(descriptor.externalDescriptor, bdkNetwork),
+                    changeDescriptor = Descriptor(descriptor.internalDescriptor, bdkNetwork),
+                    network = bdkNetwork,
+                    persister = p,
+                )
+                persister = p
+                AppLogger.info(TAG, "Wallet imported successfully")
+                descriptor
+            }
         }
 
     override suspend fun loadWallet(descriptor: WalletDescriptor): Unit =
         withContext(Dispatchers.IO) {
-            AppLogger.info(TAG, "Loading wallet from SQLite (network=${descriptor.network})")
-            val bdkNetwork = descriptor.network.toBdkNetwork()
-            val p = Persister.newSqlite(dbPath)
-            wallet = Wallet.load(
-                descriptor = Descriptor(descriptor.externalDescriptor, bdkNetwork),
-                changeDescriptor = Descriptor(descriptor.internalDescriptor, bdkNetwork),
-                persister = p,
-            )
-            persister = p
-            AppLogger.info(TAG, "Wallet loaded successfully")
+            mutex.withLock {
+                if (wallet != null) {
+                    AppLogger.info(TAG, "Wallet already loaded, skipping")
+                    return@withLock
+                }
+                AppLogger.info(TAG, "Loading wallet from SQLite (network=${descriptor.network})")
+                val bdkNetwork = descriptor.network.toBdkNetwork()
+                val p = Persister.newSqlite(dbPath)
+                wallet = Wallet.load(
+                    descriptor = Descriptor(descriptor.externalDescriptor, bdkNetwork),
+                    changeDescriptor = Descriptor(descriptor.internalDescriptor, bdkNetwork),
+                    persister = p,
+                )
+                persister = p
+                AppLogger.info(TAG, "Wallet loaded successfully")
+            }
         }
 
     override suspend fun getNewReceiveAddress(): BitcoinAddress =
         withContext(Dispatchers.IO) {
-            val w = requireNotNull(wallet) {
-                "Wallet not initialised. Call createWallet or loadWallet first."
+            mutex.withLock {
+                val w = requireNotNull(wallet) {
+                    "Wallet not initialised. Call createWallet or loadWallet first."
+                }
+                val p = requireNotNull(persister) {
+                    "Persister not initialised. Call createWallet or loadWallet first."
+                }
+                val addressInfo = w.revealNextAddress(KeychainKind.EXTERNAL)
+                // Flush the revealed address index change to SQLite so the
+                // same address is not returned on the next app session.
+                w.persist(p)
+                BitcoinAddress(addressInfo.address.toString())
             }
-            val p = requireNotNull(persister) {
-                "Persister not initialised. Call createWallet or loadWallet first."
-            }
-            val addressInfo = w.revealNextAddress(KeychainKind.EXTERNAL)
-            // Flush the revealed address index change to SQLite so the
-            // same address is not returned on the next app session.
-            w.persist(p)
-            BitcoinAddress(addressInfo.address.toString())
         }
 
     override suspend fun syncWallet(network: WalletNetwork, isFullScan: Boolean): Unit =
         withContext(Dispatchers.IO) {
-            val w = requireNotNull(wallet) {
-                "Wallet not initialised. Call createWallet or loadWallet first."
-            }
-            val p = requireNotNull(persister) {
-                "Persister not initialised. Call createWallet or loadWallet first."
-            }
-
-            val url = network.toElectrumUrl()
-                ?: error("No Electrum server configured for network $network")
-
-            AppLogger.info(TAG, "Connecting to Electrum server: $url")
-            val client = ElectrumClient(url)
-            AppLogger.info(TAG, "Electrum connection established")
-
-            try {
-                val update = if (isFullScan) {
-                    AppLogger.info(TAG, "Starting full scan (stopGap=$STOP_GAP, batchSize=$BATCH_SIZE)")
-                    val request = w.startFullScan().build()
-                    val result = client.fullScan(request, STOP_GAP, BATCH_SIZE, false)
-                    AppLogger.info(TAG, "Full scan complete")
-                    result
-                } else {
-                    AppLogger.info(TAG, "Starting incremental sync (batchSize=$BATCH_SIZE)")
-                    val request = w.startSyncWithRevealedSpks().build()
-                    val result = client.sync(request, BATCH_SIZE, false)
-                    AppLogger.info(TAG, "Incremental sync complete")
-                    result
+            mutex.withLock {
+                val w = requireNotNull(wallet) {
+                    "Wallet not initialised. Call createWallet or loadWallet first."
+                }
+                val p = requireNotNull(persister) {
+                    "Persister not initialised. Call createWallet or loadWallet first."
                 }
 
-                AppLogger.info(TAG, "Applying update to wallet")
-                w.applyUpdate(update)
-                w.persist(p)
+                val url = network.toElectrumUrl()
+                    ?: error("No Electrum server configured for network $network")
 
-                val balance = w.balance()
-                AppLogger.info(
-                    TAG,
-                    "Balance after sync — confirmed: ${balance.confirmed.toSat()} sat, " +
-                        "trusted pending: ${balance.trustedPending.toSat()} sat, " +
-                        "total: ${balance.total.toSat()} sat",
-                )
-            } catch (exception: Exception) {
-                AppLogger.error(TAG, "Sync failed: ${exception.message}", exception)
-                throw exception
-            } finally {
-                // ElectrumClient is a Rust-backed object; let the finalizer close the TCP
-                // connection when the reference is released.
-                @Suppress("UnusedExpression")
-                client
+                AppLogger.info(TAG, "Connecting to Electrum server: $url")
+                val client = ElectrumClient(url)
+                AppLogger.info(TAG, "Electrum connection established")
+
+                try {
+                    val update = if (isFullScan) {
+                        AppLogger.info(TAG, "Starting full scan (stopGap=$STOP_GAP, batchSize=$BATCH_SIZE)")
+                        val request = w.startFullScan().build()
+                        val result = client.fullScan(request, STOP_GAP, BATCH_SIZE, false)
+                        AppLogger.info(TAG, "Full scan complete")
+                        result
+                    } else {
+                        AppLogger.info(TAG, "Starting incremental sync (batchSize=$BATCH_SIZE)")
+                        val request = w.startSyncWithRevealedSpks().build()
+                        val result = client.sync(request, BATCH_SIZE, false)
+                        AppLogger.info(TAG, "Incremental sync complete")
+                        result
+                    }
+
+                    AppLogger.info(TAG, "Applying update to wallet")
+                    w.applyUpdate(update)
+                    w.persist(p)
+
+                    val balance = w.balance()
+                    AppLogger.info(
+                        TAG,
+                        "Balance after sync — confirmed: ${balance.confirmed.toSat()} sat, " +
+                            "trusted pending: ${balance.trustedPending.toSat()} sat, " +
+                            "total: ${balance.total.toSat()} sat",
+                    )
+                } catch (exception: Exception) {
+                    AppLogger.error(TAG, "Sync failed: ${exception.message}", exception)
+                    throw exception
+                } finally {
+                    // ElectrumClient is a Rust-backed object; let the finalizer close the TCP
+                    // connection when the reference is released.
+                    @Suppress("UnusedExpression")
+                    client
+                }
             }
         }
 
     override suspend fun getBalance(): Long =
         withContext(Dispatchers.IO) {
-            val w = requireNotNull(wallet) {
-                "Wallet not initialised. Call createWallet or loadWallet first."
+            mutex.withLock {
+                val w = requireNotNull(wallet) {
+                    "Wallet not initialised. Call createWallet or loadWallet first."
+                }
+                w.balance().total.toSat().toLong()
             }
-            w.balance().total.toSat().toLong()
         }
 
     private fun WalletNetwork.toBdkNetwork(): Network =

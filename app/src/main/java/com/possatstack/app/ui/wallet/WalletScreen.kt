@@ -1,10 +1,5 @@
 package com.possatstack.app.ui.wallet
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -52,7 +47,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.possatstack.app.R
 import com.possatstack.app.navigation.AppDestination
@@ -61,7 +55,7 @@ import com.possatstack.app.wallet.SyncProgress
 @Composable
 fun WalletScreen(
     onNavigate: (AppDestination) -> Unit,
-    viewModel: WalletViewModel = hiltViewModel(),
+    viewModel: WalletViewModel,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -176,15 +170,6 @@ fun WalletScreen(
                 }
             }
         }
-
-        // ── Sync progress toast ───────────────────────────────────────────────
-
-        SyncProgressToast(
-            progress = state.syncProgress,
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(bottom = 72.dp),
-        )
 
         SnackbarHost(
             hostState = snackbarHostState,
@@ -307,68 +292,6 @@ private fun BalanceCard(
                     color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
                     modifier = Modifier.align(Alignment.Start),
                 )
-            }
-        }
-    }
-}
-
-@Composable
-private fun SyncProgressToast(
-    progress: SyncProgress,
-    modifier: Modifier = Modifier,
-) {
-    AnimatedVisibility(
-        visible = progress != SyncProgress.Idle,
-        enter = slideInVertically { it / 2 } + fadeIn(),
-        exit = slideOutVertically { it / 2 } + fadeOut(),
-        modifier = modifier,
-    ) {
-        Card(
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.inverseSurface,
-            ),
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp),
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                when (progress) {
-                    is SyncProgress.FullScan -> {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(20.dp),
-                            strokeWidth = 2.dp,
-                            color = MaterialTheme.colorScheme.inverseOnSurface,
-                        )
-                        Text(
-                            text = stringResource(R.string.sync_full_scan),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.inverseOnSurface,
-                        )
-                    }
-
-                    is SyncProgress.Syncing -> {
-                        CircularProgressIndicator(
-                            progress = { progress.percent / 100f },
-                            modifier = Modifier.size(20.dp),
-                            strokeWidth = 2.dp,
-                            color = MaterialTheme.colorScheme.inverseOnSurface,
-                            trackColor = MaterialTheme.colorScheme.inverseSurface,
-                        )
-                        Text(
-                            text = stringResource(R.string.sync_in_progress, progress.percent),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.inverseOnSurface,
-                        )
-                    }
-
-                    SyncProgress.Idle -> { /* hidden by AnimatedVisibility */ }
-                }
             }
         }
     }

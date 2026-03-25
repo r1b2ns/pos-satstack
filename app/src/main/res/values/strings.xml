@@ -67,7 +67,12 @@
     <string name="danger_zone">Danger zone</string>
 
     <!-- Sync -->
+    <string name="sync_channel_name">Wallet sync</string>
+    <string name="sync_channel_description">Background sync of your Bitcoin wallet with the network</string>
+    <string name="sync_notification_title">Syncing wallet</string>
+    <string name="sync_notification_message">Connecting to the Bitcoin network…</string>
     <string name="sync_full_scan">Scanning blockchain…</string>
+    <string name="sync_subtitle">We are syncing your wallet, please wait</string>
     <string name="sync_in_progress">Syncing… %1$d%%</string>
 
     <!-- Balance -->
