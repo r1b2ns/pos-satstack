@@ -48,6 +48,7 @@
     <string name="receive_address">Receive address</string>
     <string name="receive_address_hint">Tap to copy</string>
     <string name="generate_address">Generate address</string>
+    <string name="qr_code_description">Bitcoin address QR code</string>
 
     <string name="wallet_send">Send</string>
     <string name="wallet_send_subtitle">Send Bitcoin to another address</string>
