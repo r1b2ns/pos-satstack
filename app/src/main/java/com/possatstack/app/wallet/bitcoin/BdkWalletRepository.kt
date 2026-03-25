@@ -1,6 +1,7 @@
 package com.possatstack.app.wallet.bitcoin
 
 import android.content.Context
+import com.possatstack.app.util.AppLogger
 import com.possatstack.app.wallet.BitcoinAddress
 import com.possatstack.app.wallet.WalletDescriptor
 import com.possatstack.app.wallet.WalletNetwork
@@ -8,6 +9,7 @@ import com.possatstack.app.wallet.WalletRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.bitcoindevkit.Bip39Exception
 import org.bitcoindevkit.Descriptor
 import org.bitcoindevkit.DescriptorSecretKey
 import org.bitcoindevkit.ElectrumClient
@@ -17,7 +19,6 @@ import org.bitcoindevkit.Network
 import org.bitcoindevkit.Persister
 import org.bitcoindevkit.Wallet
 import org.bitcoindevkit.WordCount
-import org.bitcoindevkit.Bip39Exception
 import java.io.File
 import javax.inject.Inject
 
@@ -45,6 +46,7 @@ class BdkWalletRepository @Inject constructor(
 
     override suspend fun createWallet(network: WalletNetwork): WalletDescriptor =
         withContext(Dispatchers.IO) {
+            AppLogger.info(TAG, "Creating new wallet (network=$network)")
             // BDK throws CreateWithPersistException$DataAlreadyExists if the SQLite file
             // already contains wallet data. Delete it first so a fresh wallet can be created.
             wallet = null
@@ -73,6 +75,7 @@ class BdkWalletRepository @Inject constructor(
                 persister = p,
             )
             persister = p
+            AppLogger.info(TAG, "Wallet created successfully")
             descriptor
         }
 
@@ -81,6 +84,7 @@ class BdkWalletRepository @Inject constructor(
      */
     override suspend fun importWallet(mnemonic: String, network: WalletNetwork): WalletDescriptor =
         withContext(Dispatchers.IO) {
+            AppLogger.info(TAG, "Importing wallet (network=$network)")
             // Wipe existing SQLite file so the new wallet can be persisted cleanly.
             wallet = null
             persister = null
@@ -108,11 +112,13 @@ class BdkWalletRepository @Inject constructor(
                 persister = p,
             )
             persister = p
+            AppLogger.info(TAG, "Wallet imported successfully")
             descriptor
         }
 
     override suspend fun loadWallet(descriptor: WalletDescriptor): Unit =
         withContext(Dispatchers.IO) {
+            AppLogger.info(TAG, "Loading wallet from SQLite (network=${descriptor.network})")
             val bdkNetwork = descriptor.network.toBdkNetwork()
             val p = Persister.newSqlite(dbPath)
             wallet = Wallet.load(
@@ -121,6 +127,7 @@ class BdkWalletRepository @Inject constructor(
                 persister = p,
             )
             persister = p
+            AppLogger.info(TAG, "Wallet loaded successfully")
         }
 
     override suspend fun getNewReceiveAddress(): BitcoinAddress =
@@ -150,17 +157,39 @@ class BdkWalletRepository @Inject constructor(
             val url = network.toElectrumUrl()
                 ?: error("No Electrum server configured for network $network")
 
+            AppLogger.info(TAG, "Connecting to Electrum server: $url")
             val client = ElectrumClient(url)
+            AppLogger.info(TAG, "Electrum connection established")
+
             try {
                 val update = if (isFullScan) {
+                    AppLogger.info(TAG, "Starting full scan (stopGap=$STOP_GAP, batchSize=$BATCH_SIZE)")
                     val request = w.startFullScan().build()
-                    client.fullScan(request, STOP_GAP, BATCH_SIZE, false)
+                    val result = client.fullScan(request, STOP_GAP, BATCH_SIZE, false)
+                    AppLogger.info(TAG, "Full scan complete")
+                    result
                 } else {
+                    AppLogger.info(TAG, "Starting incremental sync (batchSize=$BATCH_SIZE)")
                     val request = w.startSyncWithRevealedSpks().build()
-                    client.sync(request, BATCH_SIZE, false)
+                    val result = client.sync(request, BATCH_SIZE, false)
+                    AppLogger.info(TAG, "Incremental sync complete")
+                    result
                 }
+
+                AppLogger.info(TAG, "Applying update to wallet")
                 w.applyUpdate(update)
                 w.persist(p)
+
+                val balance = w.balance()
+                AppLogger.info(
+                    TAG,
+                    "Balance after sync — confirmed: ${balance.confirmed.toSat()} sat, " +
+                        "trusted pending: ${balance.trustedPending.toSat()} sat, " +
+                        "total: ${balance.total.toSat()} sat",
+                )
+            } catch (exception: Exception) {
+                AppLogger.error(TAG, "Sync failed: ${exception.message}", exception)
+                throw exception
             } finally {
                 // ElectrumClient is a Rust-backed object; let the finalizer close the TCP
                 // connection when the reference is released.
@@ -194,6 +223,7 @@ class BdkWalletRepository @Inject constructor(
         }
 
     private companion object {
+        const val TAG = "BdkWalletRepository"
         const val DB_FILE_NAME = "bdk_wallet.sqlite3"
 
         /** Gap limit: number of consecutive unused addresses before stopping the scan. */
