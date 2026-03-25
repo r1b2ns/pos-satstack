@@ -23,6 +23,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.compose.runtime.remember
 import com.possatstack.app.R
 import com.possatstack.app.ui.charge.ChargeScreen
 import com.possatstack.app.ui.components.SyncProgressToast
@@ -43,10 +44,15 @@ fun AppNavGraph(navController: NavHostController) {
     val walletViewModel: WalletViewModel = hiltViewModel()
     val walletState by walletViewModel.state.collectAsStateWithLifecycle()
 
-    // Observe backstack so canNavigateBack triggers recomposition on navigation events
-    @Suppress("UNUSED_VARIABLE")
-    val navBackStackEntry by navController.currentBackStackEntryAsState()
-    val canNavigateBack = navController.previousBackStackEntry != null
+    // Recompose on every navigation event so the top bar reacts immediately.
+    val currentBackStackEntry by navController.currentBackStackEntryAsState()
+
+    // Show back button on every destination except Home.
+    // Wrapped in remember(currentBackStackEntry) so it recalculates on every
+    // navigation event, not just on initial composition.
+    val canNavigateBack = remember(currentBackStackEntry) {
+        navController.previousBackStackEntry != null
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
