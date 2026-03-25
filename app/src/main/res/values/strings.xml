@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">POS SatStack</string>
+    <string name="app_name">The Bitcoin Machine</string>
 
     <!-- Home -->
     <string name="charge">Charge</string>
