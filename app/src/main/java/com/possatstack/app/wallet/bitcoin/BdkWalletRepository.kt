@@ -6,12 +6,14 @@ import com.possatstack.app.wallet.BitcoinAddress
 import com.possatstack.app.wallet.WalletDescriptor
 import com.possatstack.app.wallet.WalletNetwork
 import com.possatstack.app.wallet.WalletRepository
+import com.possatstack.app.wallet.WalletTransaction
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.bitcoindevkit.Bip39Exception
+import org.bitcoindevkit.ChainPosition
 import org.bitcoindevkit.Descriptor
 import org.bitcoindevkit.DescriptorSecretKey
 import org.bitcoindevkit.ElectrumClient
@@ -226,6 +228,39 @@ class BdkWalletRepository @Inject constructor(
                     "Wallet not initialised. Call createWallet or loadWallet first."
                 }
                 w.balance().total.toSat().toLong()
+            }
+        }
+
+    override suspend fun getTransactions(): List<WalletTransaction> =
+        withContext(Dispatchers.IO) {
+            mutex.withLock {
+                val w = requireNotNull(wallet) {
+                    "Wallet not initialised. Call createWallet or loadWallet first."
+                }
+                w.transactions().map { canonicalTx ->
+                    val transaction = canonicalTx.transaction
+                    val amounts = w.sentAndReceived(transaction)
+                    val chainPosition = canonicalTx.chainPosition
+
+                    val isConfirmed = chainPosition is ChainPosition.Confirmed
+                    val confirmationTime = (chainPosition as? ChainPosition.Confirmed)
+                        ?.confirmationBlockTime?.confirmationTime?.toLong()
+                    val blockHeight = (chainPosition as? ChainPosition.Confirmed)
+                        ?.confirmationBlockTime?.blockId?.height?.toLong()
+
+                    WalletTransaction(
+                        txid = transaction.computeTxid().toString(),
+                        sentSats = amounts.sent.toSat().toLong(),
+                        receivedSats = amounts.received.toSat().toLong(),
+                        feeSats = null, // fee not available from sentAndReceived
+                        confirmationTime = confirmationTime,
+                        blockHeight = blockHeight,
+                        isConfirmed = isConfirmed,
+                    )
+                }.sortedWith(
+                    compareBy<WalletTransaction> { it.isConfirmed }
+                        .thenByDescending { it.confirmationTime ?: Long.MAX_VALUE },
+                )
             }
         }
 

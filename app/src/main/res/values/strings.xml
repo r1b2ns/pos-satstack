@@ -52,6 +52,15 @@
 
     <string name="wallet_send">Send</string>
     <string name="wallet_send_subtitle">Send Bitcoin to another address</string>
+
+    <string name="wallet_transactions">Transaction history</string>
+    <string name="wallet_transactions_subtitle">View all wallet transactions</string>
+    <string name="unconfirmed_transactions">Pending</string>
+    <string name="no_transactions">No transactions yet</string>
+    <string name="transaction_received">Received</string>
+    <string name="transaction_sent">Sent</string>
+    <string name="transaction_confirmations">%1$d confirmations</string>
+    <string name="transaction_unconfirmed">Unconfirmed</string>
     <string name="recipient_address">Recipient address</string>
     <string name="amount_sats">Amount (sats)</string>
     <string name="send">Send</string>

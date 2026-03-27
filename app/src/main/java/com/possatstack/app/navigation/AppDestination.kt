@@ -31,4 +31,7 @@ sealed interface AppDestination {
 
     @Serializable
     data object WalletSeedPhrase : AppDestination
+
+    @Serializable
+    data object WalletTransactions : AppDestination
 }
