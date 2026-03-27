@@ -50,4 +50,12 @@ interface WalletRepository {
      * Throws [IllegalStateException] if the wallet has not been initialised.
      */
     suspend fun getBalance(): Long
+
+    /**
+     * Returns all transactions known to the wallet, sorted by confirmation time
+     * descending (most recent first). Unconfirmed transactions appear before
+     * confirmed ones.
+     * Throws [IllegalStateException] if the wallet has not been initialised.
+     */
+    suspend fun getTransactions(): List<WalletTransaction>
 }

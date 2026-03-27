@@ -7,6 +7,7 @@ import com.possatstack.app.wallet.WalletDescriptor
 import com.possatstack.app.wallet.WalletNetwork
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
+import androidx.core.content.edit
 
 /**
  * [WalletStorage] implementation backed by [EncryptedSharedPreferences].
@@ -64,11 +65,11 @@ class SecureWalletStorage @Inject constructor(
     }
 
     override fun clear() {
-        prefs.edit().clear().apply()
+        prefs.edit { clear() }
     }
 
     override fun markFullScanDone() {
-        prefs.edit().putBoolean(KEY_FULL_SCAN_DONE, true).apply()
+        prefs.edit { putBoolean(KEY_FULL_SCAN_DONE, true) }
     }
 
     override fun isFullScanDone(): Boolean =

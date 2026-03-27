@@ -5,7 +5,9 @@ import androidx.lifecycle.viewModelScope
 import com.possatstack.app.wallet.SyncProgress
 import com.possatstack.app.wallet.WalletNetwork
 import com.possatstack.app.wallet.WalletRepository
+import com.possatstack.app.wallet.WalletTransaction
 import com.possatstack.app.wallet.storage.WalletStorage
+import com.possatstack.app.util.AppLogger
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -28,6 +30,8 @@ class WalletViewModel @Inject constructor(
         val errorMessage: String? = null,
         val balanceSats: Long? = null,
         val syncProgress: SyncProgress = SyncProgress.Idle,
+        val transactions: List<WalletTransaction> = emptyList(),
+        val network: WalletNetwork? = null,
     )
 
     private val _state = MutableStateFlow(State())
@@ -47,7 +51,9 @@ class WalletViewModel @Inject constructor(
             _state.update { it.copy(isLoading = true) }
             runCatching { walletRepository.loadWallet(descriptor) }
                 .onSuccess {
-                    _state.update { it.copy(isLoading = false, hasWallet = true) }
+                    _state.update {
+                        it.copy(isLoading = false, hasWallet = true, network = descriptor.network)
+                    }
                     syncWallet()
                 }
                 .onFailure { e ->
@@ -62,8 +68,9 @@ class WalletViewModel @Inject constructor(
             runCatching { walletRepository.createWallet(WalletNetwork.SIGNET) }
                 .onSuccess { descriptor ->
                     walletStorage.save(descriptor)
-                    // New wallet — no previous scan, mark as unseen so full scan runs
-                    _state.update { it.copy(isLoading = false, hasWallet = true) }
+                    _state.update {
+                        it.copy(isLoading = false, hasWallet = true, network = descriptor.network)
+                    }
                     syncWallet()
                 }
                 .onFailure { e ->
@@ -83,8 +90,9 @@ class WalletViewModel @Inject constructor(
             runCatching { walletRepository.importWallet(mnemonic, WalletNetwork.SIGNET) }
                 .onSuccess { descriptor ->
                     walletStorage.save(descriptor)
-                    // Imported wallet — must do full scan to discover past transactions
-                    _state.update { it.copy(isLoading = false, hasWallet = true) }
+                    _state.update {
+                        it.copy(isLoading = false, hasWallet = true, network = descriptor.network)
+                    }
                     syncWallet()
                 }
                 .onFailure { e ->
@@ -169,9 +177,21 @@ class WalletViewModel @Inject constructor(
             }
     }
 
+    fun loadTransactions() {
+        viewModelScope.launch {
+            runCatching { walletRepository.getTransactions() }
+                .onSuccess { transactions ->
+                    _state.update { it.copy(transactions = transactions) }
+                }
+        }
+    }
+
     private suspend fun loadBalanceAfterSync() {
         val balance = runCatching { walletRepository.getBalance() }.getOrNull()
-        _state.update { it.copy(syncProgress = SyncProgress.Idle, balanceSats = balance) }
+        val transactions = runCatching { walletRepository.getTransactions() }.getOrElse { emptyList() }
+        _state.update {
+            it.copy(syncProgress = SyncProgress.Idle, balanceSats = balance, transactions = transactions)
+        }
     }
 
     fun getMnemonic(): String? = walletStorage.load()?.mnemonic

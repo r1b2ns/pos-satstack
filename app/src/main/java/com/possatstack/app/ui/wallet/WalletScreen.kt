@@ -18,6 +18,7 @@ import androidx.compose.material.icons.automirrored.filled.CallReceived
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Key
+import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
@@ -131,6 +132,15 @@ fun WalletScreen(
                 subtitle = stringResource(R.string.wallet_send_subtitle),
                 enabled = state.hasWallet,
                 onClick = { onNavigate(AppDestination.WalletSend) },
+            )
+            HorizontalDivider(modifier = Modifier.padding(start = 72.dp))
+
+            WalletListItem(
+                icon = Icons.Default.List,
+                title = stringResource(R.string.wallet_transactions),
+                subtitle = stringResource(R.string.wallet_transactions_subtitle),
+                enabled = state.hasWallet,
+                onClick = { onNavigate(AppDestination.WalletTransactions) },
             )
 
             // ── Security ──────────────────────────────────────────────────────

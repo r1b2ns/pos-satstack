@@ -35,6 +35,7 @@ import com.possatstack.app.ui.wallet.import.WalletImportScreen
 import com.possatstack.app.ui.wallet.receive.WalletReceiveScreen
 import com.possatstack.app.ui.wallet.seedphrase.WalletSeedPhraseScreen
 import com.possatstack.app.ui.wallet.send.WalletSendScreen
+import com.possatstack.app.ui.wallet.transactions.WalletTransactionsScreen
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -123,6 +124,10 @@ fun AppNavGraph(navController: NavHostController) {
 
                 composable<AppDestination.WalletSend> {
                     WalletSendScreen()
+                }
+
+                composable<AppDestination.WalletTransactions> {
+                    WalletTransactionsScreen(viewModel = walletViewModel)
                 }
 
                 composable<AppDestination.WalletSeedPhrase> {
