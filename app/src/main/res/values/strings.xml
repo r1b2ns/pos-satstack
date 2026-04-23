@@ -2,14 +2,14 @@
 <resources>
     <string name="app_name">The Bitcoin Machine</string>
 
-    <!-- Home -->
+    <!-- Charge -->
     <string name="charge">Charge</string>
-    <string name="charge_subtitle">Create a Bitcoin payment request</string>
+    <string name="charge_sats_label">sats</string>
+    <string name="charge_key_clear">C</string>
+    <string name="charge_key_backspace">&lt;</string>
     <string name="settings">Settings</string>
-    <string name="settings_subtitle">Wallet, network and preferences</string>
 
     <!-- Common -->
-    <string name="the_bitcoin_machine">The Bitcoin Machine</string>
     <string name="back">Back</string>
     <string name="coming_soon">Coming soon</string>
     <string name="confirm">Confirm</string>

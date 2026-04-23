@@ -5,7 +5,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -15,6 +17,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -27,7 +30,6 @@ import androidx.compose.runtime.remember
 import com.possatstack.app.R
 import com.possatstack.app.ui.charge.ChargeScreen
 import com.possatstack.app.ui.components.SyncProgressToast
-import com.possatstack.app.ui.home.HomeScreen
 import com.possatstack.app.ui.settings.SettingsScreen
 import com.possatstack.app.ui.wallet.WalletScreen
 import com.possatstack.app.ui.wallet.WalletViewModel
@@ -55,11 +57,19 @@ fun AppNavGraph(navController: NavHostController) {
         navController.previousBackStackEntry != null
     }
 
+    val isChargeRoute = remember(currentBackStackEntry) {
+        currentBackStackEntry?.destination?.route?.contains("Charge") == true
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
             topBar = {
                 CenterAlignedTopAppBar(
-                    title = { Text(stringResource(R.string.the_bitcoin_machine)) },
+                    title = {
+                        if (!isChargeRoute) {
+                            Text(stringResource(R.string.settings))
+                        }
+                    },
                     navigationIcon = {
                         if (canNavigateBack) {
                             IconButton(onClick = { navController.popBackStack() }) {
@@ -70,22 +80,35 @@ fun AppNavGraph(navController: NavHostController) {
                             }
                         }
                     },
+                    actions = {
+                        if (isChargeRoute) {
+                            IconButton(onClick = {
+                                navController.navigate(AppDestination.Settings) {
+                                    launchSingleTop = true
+                                }
+                            }) {
+                                Icon(
+                                    imageVector = Icons.Default.Settings,
+                                    contentDescription = stringResource(R.string.settings),
+                                )
+                            }
+                        }
+                    },
+                    colors = if (isChargeRoute) {
+                        TopAppBarDefaults.centerAlignedTopAppBarColors(
+                            containerColor = Color.White,
+                        )
+                    } else {
+                        TopAppBarDefaults.centerAlignedTopAppBarColors()
+                    },
                 )
             },
         ) { innerPadding ->
             NavHost(
                 navController = navController,
-                startDestination = AppDestination.Home,
+                startDestination = AppDestination.Charge,
                 modifier = Modifier.padding(innerPadding),
             ) {
-                composable<AppDestination.Home> {
-                    HomeScreen(
-                        onMenuEntryClick = { destination ->
-                            navController.navigate(destination) { launchSingleTop = true }
-                        },
-                    )
-                }
-
                 composable<AppDestination.Charge> {
                     ChargeScreen()
                 }

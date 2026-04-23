@@ -7,9 +7,6 @@ sealed interface AppDestination {
     // ── Root ─────────────────────────────────────────────────────────────────
 
     @Serializable
-    data object Home : AppDestination
-
-    @Serializable
     data object Charge : AppDestination
 
     @Serializable
