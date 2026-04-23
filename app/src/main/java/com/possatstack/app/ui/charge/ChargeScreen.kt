@@ -39,7 +39,7 @@ import androidx.compose.ui.unit.sp
 import com.possatstack.app.R
 import com.possatstack.app.ui.theme.BitcoinOrange
 import com.possatstack.app.ui.theme.PosTheme
-import java.util.Locale
+import com.possatstack.app.util.SatsFormatter
 
 private val KeypadTextColor = Color.Black
 private val KeypadDividerColor = Color(0xFFEEEEEE)
@@ -95,7 +95,7 @@ private fun AmountDisplay(
     amountSats: String,
     modifier: Modifier = Modifier,
 ) {
-    val displayText = "₿${formatSats(amountSats)}"
+    val displayText = "₿${SatsFormatter.format(amountSats)}"
     var amountFontSize by remember(displayText) { mutableStateOf(64.sp) }
 
     Column(
@@ -282,11 +282,6 @@ private fun ChargeButton(
             fontWeight = FontWeight.SemiBold,
         )
     }
-}
-
-private fun formatSats(rawSats: String): String {
-    val value = rawSats.toLongOrNull() ?: return rawSats
-    return String.format(Locale.US, "%,d", value)
 }
 
 @Preview(showBackground = true)
