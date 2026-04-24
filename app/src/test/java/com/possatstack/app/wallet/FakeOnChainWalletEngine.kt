@@ -22,7 +22,6 @@ class FakeOnChainWalletEngine : OnChainWalletEngine {
 
     var receiveAddressResult: Result<BitcoinAddress> = Result.success(BitcoinAddress("bc1qtest"))
     var createPsbtResult: Result<UnsignedPsbt> = Result.success(UnsignedPsbt("cHNidP//", "fp"))
-    var signPsbtResult: Result<SignedPsbt> = Result.success(SignedPsbt("cHNidP//signed"))
     var broadcastResult: Result<Txid> = Result.success(Txid("abcd" + "0".repeat(60)))
     var bumpFeeResult: Result<UnsignedPsbt> = Result.success(UnsignedPsbt("cHNidP//bump", "fp"))
     var estimateFeesResult: Result<FeeEstimate> = Result.success(FeeEstimate(5.0, 6))
@@ -42,7 +41,6 @@ class FakeOnChainWalletEngine : OnChainWalletEngine {
     var exportBackupCount = 0
     var receiveAddressCount = 0
     var createPsbtCount = 0
-    var signPsbtCount = 0
     var broadcastCount = 0
     var bumpFeeCount = 0
     var estimateFeesCount = 0
@@ -104,14 +102,6 @@ class FakeOnChainWalletEngine : OnChainWalletEngine {
     ): UnsignedPsbt {
         createPsbtCount++
         return createPsbtResult.getOrThrow()
-    }
-
-    override suspend fun signPsbt(
-        psbt: UnsignedPsbt,
-        auth: BiometricAuthenticator,
-    ): SignedPsbt {
-        signPsbtCount++
-        return signPsbtResult.getOrThrow()
     }
 
     override suspend fun broadcast(signed: SignedPsbt): Txid {

@@ -317,33 +317,6 @@ class BdkOnChainEngine
                 }
             }
 
-        override suspend fun signPsbt(
-            psbt: UnsignedPsbt,
-            auth: BiometricAuthenticator,
-        ): SignedPsbt =
-            withContext(Dispatchers.IO) {
-                mutex.withLock {
-                    val activeWallet = requireLoaded()
-                    // `auth` is consulted indirectly: the wallet is loaded from the
-                    // secret descriptors stored in [WalletStorage], which are already
-                    // encrypted at rest. In Fase 3 the Signer is extracted and this
-                    // path re-reads the mnemonic from [SignerSecretStore] — that is
-                    // when [auth] gets wired to BiometricPrompt.
-                    @Suppress("UNUSED_EXPRESSION")
-                    auth
-                    try {
-                        val bdkPsbt = Psbt(psbt.base64)
-                        val signed = activeWallet.sign(bdkPsbt, null)
-                        if (!signed) throw WalletError.SigningFailed("No inputs signed")
-                        val finalised = activeWallet.finalizePsbt(bdkPsbt, null)
-                        if (!finalised) throw WalletError.SigningFailed("PSBT not fully finalised")
-                        SignedPsbt(base64 = bdkPsbt.serialize())
-                    } catch (exception: Exception) {
-                        throw exception.toWalletError()
-                    }
-                }
-            }
-
         override suspend fun broadcast(signed: SignedPsbt): Txid =
             withContext(Dispatchers.IO) {
                 try {
