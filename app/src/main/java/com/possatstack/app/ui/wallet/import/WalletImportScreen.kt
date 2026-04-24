@@ -51,9 +51,10 @@ fun WalletImportScreen(
 
     var mnemonic by remember { mutableStateOf("") }
 
-    val wordCount = remember(mnemonic) {
-        mnemonic.trim().split("\\s+".toRegex()).count { it.isNotEmpty() }
-    }
+    val wordCount =
+        remember(mnemonic) {
+            mnemonic.trim().split("\\s+".toRegex()).count { it.isNotEmpty() }
+        }
     val isValid = wordCount == 12 || wordCount == 24
 
     // Navigate back automatically after successful import
@@ -70,9 +71,10 @@ fun WalletImportScreen(
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(24.dp),
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
@@ -91,12 +93,13 @@ fun WalletImportScreen(
                 minLines = 4,
                 maxLines = 6,
                 modifier = Modifier.fillMaxWidth(),
-                keyboardOptions = KeyboardOptions(
-                    capitalization = KeyboardCapitalization.None,
-                    autoCorrectEnabled = false,
-                    keyboardType = KeyboardType.Password,
-                    imeAction = ImeAction.Done,
-                ),
+                keyboardOptions =
+                    KeyboardOptions(
+                        capitalization = KeyboardCapitalization.None,
+                        autoCorrectEnabled = false,
+                        keyboardType = KeyboardType.Password,
+                        imeAction = ImeAction.Done,
+                    ),
                 trailingIcon = {
                     IconButton(
                         onClick = {
@@ -114,8 +117,12 @@ fun WalletImportScreen(
                 supportingText = {
                     Text(
                         text = "$wordCount / 12 or 24 words",
-                        color = if (isValid) MaterialTheme.colorScheme.primary
-                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                        color =
+                            if (isValid) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            },
                     )
                 },
             )

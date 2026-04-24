@@ -4,7 +4,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class SatsFormatterTest {
-
     @Test
     fun `zero is returned without grouping`() {
         assertEquals("0", SatsFormatter.format("0"))

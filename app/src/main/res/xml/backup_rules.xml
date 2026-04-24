@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Legacy auto-backup rules (API < 31). Matches data_extraction_rules.xml. -->
+<full-backup-content>
+    <exclude domain="sharedpref" path="mnemonic_secure_prefs.xml" />
+    <exclude domain="sharedpref" path="wallet_secure_prefs.xml" />
+</full-backup-content>

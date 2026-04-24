@@ -9,8 +9,7 @@ import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import com.possatstack.app.R
 import com.possatstack.app.util.AppLogger
-import com.possatstack.app.wallet.WalletRepository
-import com.possatstack.app.wallet.storage.WalletStorage
+import com.possatstack.app.wallet.OnChainWalletEngine
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -20,25 +19,27 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
- * Foreground service that runs an Electrum wallet sync as soon as the app opens.
+ * Foreground service that runs an Esplora wallet sync as soon as the app opens.
  *
- * It is started from [MainActivity] on every launch and stops itself as soon
- * as the sync finishes (or fails). Using START_NOT_STICKY means Android will
- * not restart the service if the process is killed mid-sync.
+ * Started from [MainActivity] on every launch and stops itself as soon as the
+ * sync finishes (or fails). START_NOT_STICKY means Android will not restart
+ * the service if the process is killed mid-sync.
  *
- * The service decides between a full scan and an incremental sync based on
- * [WalletStorage.isFullScanDone]. On success it marks the full scan as done
- * so future launches use the faster incremental path.
+ * Full-scan vs. incremental is decided by the engine based on its own
+ * persisted state (`isFullScanDone` + `CHAIN_BACKEND` comparison). This
+ * service stays backend-agnostic.
  */
 @AndroidEntryPoint
 class WalletSyncService : Service() {
-
-    @Inject lateinit var walletRepository: WalletRepository
-    @Inject lateinit var walletStorage: WalletStorage
+    @Inject lateinit var engine: OnChainWalletEngine
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+    override fun onStartCommand(
+        intent: Intent?,
+        flags: Int,
+        startId: Int,
+    ): Int {
         startForegroundCompat(buildNotification())
 
         serviceScope.launch {
@@ -50,19 +51,14 @@ class WalletSyncService : Service() {
     }
 
     private suspend fun runSync() {
-        val descriptor = walletStorage.load() ?: run {
+        if (!engine.hasWallet()) {
             AppLogger.info(TAG, "No wallet found — skipping startup sync")
             return
         }
-
         runCatching {
-            val isFullScan = !walletStorage.isFullScanDone()
-            AppLogger.info(TAG, "Startup sync started (fullScan=$isFullScan, network=${descriptor.network})")
-
-            walletRepository.loadWallet(descriptor)
-            walletRepository.syncWallet(descriptor.network, isFullScan)
-
-            if (isFullScan) walletStorage.markFullScanDone()
+            AppLogger.info(TAG, "Startup sync started")
+            engine.loadWallet()
+            engine.sync()
             AppLogger.info(TAG, "Startup sync completed successfully")
         }.onFailure { exception ->
             AppLogger.error(TAG, "Startup sync failed", exception)

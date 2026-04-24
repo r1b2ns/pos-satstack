@@ -8,7 +8,6 @@ import dagger.hilt.android.HiltAndroidApp
 
 @HiltAndroidApp
 class PosApplication : Application() {
-
     override fun onCreate() {
         super.onCreate()
         createNotificationChannels()
@@ -17,14 +16,15 @@ class PosApplication : Application() {
     private fun createNotificationChannels() {
         val manager = getSystemService(NotificationManager::class.java)
 
-        val syncChannel = NotificationChannel(
-            WalletSyncService.CHANNEL_ID,
-            getString(R.string.sync_channel_name),
-            NotificationManager.IMPORTANCE_LOW,
-        ).apply {
-            description = getString(R.string.sync_channel_description)
-            setShowBadge(false)
-        }
+        val syncChannel =
+            NotificationChannel(
+                WalletSyncService.CHANNEL_ID,
+                getString(R.string.sync_channel_name),
+                NotificationManager.IMPORTANCE_LOW,
+            ).apply {
+                description = getString(R.string.sync_channel_description)
+                setShowBadge(false)
+            }
 
         manager.createNotificationChannel(syncChannel)
     }

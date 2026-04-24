@@ -19,8 +19,8 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.VerticalDivider
 import androidx.compose.material3.Text
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -54,16 +54,18 @@ fun ChargeScreen() {
     var amountSats by rememberSaveable { mutableStateOf("0") }
 
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.White)
-            .padding(horizontal = 24.dp, vertical = 16.dp),
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(Color.White)
+                .padding(horizontal = 24.dp, vertical = 16.dp),
     ) {
         AmountDisplay(
             amountSats = amountSats,
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
         )
 
         Keypad(
@@ -110,9 +112,10 @@ private fun AmountDisplay(
             color = KeypadTextColor,
             maxLines = 1,
             softWrap = false,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 8.dp),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp),
             textAlign = TextAlign.Center,
             onTextLayout = { result ->
                 if (result.didOverflowWidth && amountFontSize.value > 24f) {
@@ -188,9 +191,10 @@ private fun RowScope.EmptyKey() {
 @Composable
 private fun KeypadRow(content: @Composable RowScope.() -> Unit) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(64.dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .height(64.dp),
         verticalAlignment = Alignment.CenterVertically,
         content = content,
     )
@@ -214,12 +218,18 @@ private fun KeypadColumnDivider() {
 }
 
 @Composable
-private fun RowScope.DigitKey(digit: Int, onDigit: (Int) -> Unit) {
+private fun RowScope.DigitKey(
+    digit: Int,
+    onDigit: (Int) -> Unit,
+) {
     TextKey(label = digit.toString(), onClick = { onDigit(digit) })
 }
 
 @Composable
-private fun RowScope.TextKey(label: String, onClick: () -> Unit) {
+private fun RowScope.TextKey(
+    label: String,
+    onClick: () -> Unit,
+) {
     KeyContainer(onClick = onClick) {
         Text(
             text = label,
@@ -247,11 +257,12 @@ private fun RowScope.KeyContainer(
     content: @Composable () -> Unit,
 ) {
     Box(
-        modifier = Modifier
-            .weight(1f)
-            .fillMaxWidth()
-            .height(64.dp)
-            .clickable(onClick = onClick),
+        modifier =
+            Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .height(64.dp)
+                .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
         content = { content() },
     )
@@ -265,16 +276,18 @@ private fun ChargeButton(
     Button(
         onClick = onClick,
         enabled = enabled,
-        colors = ButtonDefaults.buttonColors(
-            containerColor = BitcoinOrange,
-            contentColor = Color.White,
-            disabledContainerColor = ChargeButtonDisabledColor,
-            disabledContentColor = ChargeButtonDisabledContent,
-        ),
+        colors =
+            ButtonDefaults.buttonColors(
+                containerColor = BitcoinOrange,
+                contentColor = Color.White,
+                disabledContainerColor = ChargeButtonDisabledColor,
+                disabledContentColor = ChargeButtonDisabledContent,
+            ),
         shape = RoundedCornerShape(32.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(56.dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .height(56.dp),
     ) {
         Text(
             text = stringResource(R.string.charge),

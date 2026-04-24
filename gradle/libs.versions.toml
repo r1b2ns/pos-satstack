@@ -10,7 +10,9 @@ activityCompose = "1.9.3"
 composeBom = "2024.12.01"
 navigationCompose = "2.8.5"
 ktlint = "12.1.1"
-bdkAndroid = "2.3.1"
+bdkAndroid = "2.3.1"           # fornece EsploraClient e ElectrumClient (backend atual)
+# kyoto = "X.Y.Z"              # descomentar ao trocar para Kyoto (coord. TBD, ex.: org.bitcoindevkit:bdk-kyoto)
+# floresta = "X.Y.Z"           # descomentar ao trocar para Floresta (coord. TBD)
 zxingCore = "3.5.3"
 securityCrypto = "1.1.0-alpha06"
 junit = "4.13.2"
@@ -27,7 +29,11 @@ androidx-ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling" }
 androidx-material3 = { group = "androidx.compose.material3", name = "material3" }
 androidx-material-icons-extended = { group = "androidx.compose.material", name = "material-icons-extended" }
 androidx-navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navigationCompose" }
+# Chain backend ativo: Esplora via BDK (EsploraClient embutido)
 bdk-android = { group = "org.bitcoindevkit", name = "bdk-android", version.ref = "bdkAndroid" }
+# Alternativas — descomentar apenas uma e trocar o @Binds em WalletModule + CHAIN_BACKEND em build.gradle
+# bdk-kyoto = { group = "org.bitcoindevkit", name = "bdk-kyoto", version.ref = "kyoto" }
+# floresta  = { group = "TBD",               name = "TBD",       version.ref = "floresta" }
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinxSerializationJson" }
 hilt-android = { group = "com.google.dagger", name = "hilt-android", version.ref = "hilt" }
 hilt-compiler = { group = "com.google.dagger", name = "hilt-compiler", version.ref = "hilt" }

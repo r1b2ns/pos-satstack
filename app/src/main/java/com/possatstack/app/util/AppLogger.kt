@@ -14,16 +14,26 @@ import com.possatstack.app.BuildConfig
  *   AppLogger.error("WalletRepo", "Sync failed", exception)
  */
 object AppLogger {
-
-    fun info(tag: String, message: String) {
+    fun info(
+        tag: String,
+        message: String,
+    ) {
         if (BuildConfig.DEBUG) Log.i(tag, message)
     }
 
-    fun warning(tag: String, message: String, throwable: Throwable? = null) {
+    fun warning(
+        tag: String,
+        message: String,
+        throwable: Throwable? = null,
+    ) {
         if (BuildConfig.DEBUG) Log.w(tag, message, throwable)
     }
 
-    fun error(tag: String, message: String, throwable: Throwable? = null) {
+    fun error(
+        tag: String,
+        message: String,
+        throwable: Throwable? = null,
+    ) {
         if (BuildConfig.DEBUG) Log.e(tag, message, throwable)
     }
 }

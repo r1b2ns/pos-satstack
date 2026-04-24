@@ -37,16 +37,15 @@ import com.possatstack.app.util.generateQrBitmap
 private const val QR_SIZE_PX = 512
 
 @Composable
-fun WalletReceiveScreen(
-    viewModel: WalletViewModel = hiltViewModel(),
-) {
+fun WalletReceiveScreen(viewModel: WalletViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
 
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(24.dp),
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
@@ -66,18 +65,20 @@ fun WalletReceiveScreen(
 
                 OutlinedCard(modifier = Modifier.fillMaxWidth()) {
                     Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
                         Image(
                             bitmap = qrBitmap.asImageBitmap(),
                             contentDescription = stringResource(R.string.qr_code_description),
                             contentScale = ContentScale.Fit,
-                            modifier = Modifier
-                                .fillMaxWidth(0.8f)
-                                .aspectRatio(1f),
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth(0.8f)
+                                    .aspectRatio(1f),
                         )
 
                         Spacer(modifier = Modifier.height(16.dp))
@@ -85,9 +86,10 @@ fun WalletReceiveScreen(
                         SelectionContainer {
                             Text(
                                 text = address,
-                                style = MaterialTheme.typography.bodyMedium.copy(
-                                    fontFamily = FontFamily.Monospace,
-                                ),
+                                style =
+                                    MaterialTheme.typography.bodyMedium.copy(
+                                        fontFamily = FontFamily.Monospace,
+                                    ),
                                 textAlign = TextAlign.Center,
                             )
                         }

@@ -19,7 +19,9 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -28,28 +30,36 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.possatstack.app.R
 import com.possatstack.app.ui.wallet.WalletViewModel
 
 @Composable
-fun WalletSeedPhraseScreen(
-    viewModel: WalletViewModel = hiltViewModel(),
-) {
-    val mnemonic = remember { viewModel.getMnemonic() }
-    val words = remember(mnemonic) { mnemonic?.split(" ") ?: emptyList() }
+fun WalletSeedPhraseScreen(viewModel: WalletViewModel = hiltViewModel()) {
+    val state by viewModel.state.collectAsStateWithLifecycle()
+
+    LaunchedEffect(Unit) {
+        viewModel.loadMnemonic()
+    }
+    DisposableEffect(Unit) {
+        onDispose { viewModel.clearMnemonicFromState() }
+    }
+
+    val words = state.mnemonic?.split(" ") ?: emptyList()
 
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(24.dp),
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        // Warning banner
         Card(
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.errorContainer,
-            ),
+            colors =
+                CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                ),
             modifier = Modifier.fillMaxWidth(),
         ) {
             Text(
@@ -70,7 +80,6 @@ fun WalletSeedPhraseScreen(
                 textAlign = TextAlign.Center,
             )
         } else {
-            // Words in a 2-column grid
             val pairs = words.chunked(2)
             pairs.forEachIndexed { rowIndex, pair ->
                 Row(
@@ -85,7 +94,6 @@ fun WalletSeedPhraseScreen(
                             modifier = Modifier.weight(1f),
                         )
                     }
-                    // Fill empty slot if odd number of words
                     if (pair.size == 1) {
                         Box(modifier = Modifier.weight(1f))
                     }
@@ -103,12 +111,13 @@ private fun SeedWord(
     modifier: Modifier = Modifier,
 ) {
     Row(
-        modifier = modifier
-            .background(
-                color = MaterialTheme.colorScheme.surfaceVariant,
-                shape = RoundedCornerShape(8.dp),
-            )
-            .padding(horizontal = 12.dp, vertical = 10.dp),
+        modifier =
+            modifier
+                .background(
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    shape = RoundedCornerShape(8.dp),
+                )
+                .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
@@ -120,10 +129,11 @@ private fun SeedWord(
         )
         Text(
             text = word,
-            style = MaterialTheme.typography.bodyMedium.copy(
-                fontFamily = FontFamily.Monospace,
-                fontWeight = FontWeight.Medium,
-            ),
+            style =
+                MaterialTheme.typography.bodyMedium.copy(
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Medium,
+                ),
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }

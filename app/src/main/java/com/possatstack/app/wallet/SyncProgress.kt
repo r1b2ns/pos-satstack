@@ -9,6 +9,8 @@ package com.possatstack.app.wallet
  */
 sealed class SyncProgress {
     data object Idle : SyncProgress()
+
     data object FullScan : SyncProgress()
+
     data class Syncing(val percent: Int) : SyncProgress()
 }

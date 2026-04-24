@@ -3,7 +3,6 @@ package com.possatstack.app.navigation
 import kotlinx.serialization.Serializable
 
 sealed interface AppDestination {
-
     // ── Root ─────────────────────────────────────────────────────────────────
 
     @Serializable

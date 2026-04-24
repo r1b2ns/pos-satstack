@@ -3,7 +3,6 @@ package com.possatstack.app.util
 import java.util.Locale
 
 object SatsFormatter {
-
     /**
      * Formats a satoshi amount (given as a raw digit string) with grouping
      * separators (e.g. "5449" -> "5,449", "325000000" -> "325,000,000").
