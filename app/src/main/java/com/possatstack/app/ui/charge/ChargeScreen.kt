@@ -17,15 +17,19 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Backspace
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.Snackbar
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -33,12 +37,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.possatstack.app.R
 import com.possatstack.app.ui.theme.BitcoinOrange
-import com.possatstack.app.ui.theme.PosTheme
 import com.possatstack.app.util.SatsFormatter
 
 private val KeypadTextColor = Color.Black
@@ -47,47 +51,56 @@ private val BackspaceIconColor = Color(0xFFE53935)
 private val ChargeButtonDisabledColor = Color(0xFFE0E0E0)
 private val ChargeButtonDisabledContent = Color(0xFF9E9E9E)
 
-private const val MAX_SATS: Long = 100_000_000L
-
 @Composable
-fun ChargeScreen() {
-    var amountSats by rememberSaveable { mutableStateOf("0") }
+fun ChargeScreen(
+    onChargeCreated: (chargeId: String) -> Unit,
+    viewModel: ChargeViewModel = hiltViewModel(),
+) {
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    val snackbarHostState = remember { SnackbarHostState() }
 
-    Column(
-        modifier =
-            Modifier
-                .fillMaxSize()
-                .background(Color.White)
-                .padding(horizontal = 24.dp, vertical = 16.dp),
-    ) {
-        AmountDisplay(
-            amountSats = amountSats,
+    LaunchedEffect(state.errorMessage) {
+        state.errorMessage?.let {
+            snackbarHostState.showSnackbar(it)
+            viewModel.clearError()
+        }
+    }
+
+    Box(modifier = Modifier.fillMaxSize().background(Color.White)) {
+        Column(
             modifier =
                 Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-        )
+                    .fillMaxSize()
+                    .padding(horizontal = 24.dp, vertical = 16.dp),
+        ) {
+            AmountDisplay(
+                amountSats = state.amountInput,
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+            )
 
-        Keypad(
-            showEditKeys = amountSats != "0",
-            onDigit = { digit ->
-                val next = if (amountSats == "0") digit.toString() else amountSats + digit
-                val nextValue = next.toLongOrNull()
-                if (nextValue != null && nextValue <= MAX_SATS) {
-                    amountSats = next
-                }
-            },
-            onClear = { amountSats = "0" },
-            onBackspace = {
-                amountSats = if (amountSats.length > 1) amountSats.dropLast(1) else "0"
-            },
-        )
+            Keypad(
+                showEditKeys = state.amountInput != "0",
+                onDigit = viewModel::appendDigit,
+                onClear = viewModel::clearAmount,
+                onBackspace = viewModel::backspace,
+            )
 
-        Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(24.dp))
 
-        ChargeButton(
-            enabled = amountSats != "0",
-            onClick = { /* TODO: create payment request */ },
+            ChargeButton(
+                enabled = state.amountInput != "0" && !state.isCreating,
+                isLoading = state.isCreating,
+                onClick = { viewModel.createOnChainCharge(onChargeCreated) },
+            )
+        }
+
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier.align(Alignment.BottomCenter),
+            snackbar = { data -> Snackbar(snackbarData = data) },
         )
     }
 }
@@ -271,6 +284,7 @@ private fun RowScope.KeyContainer(
 @Composable
 private fun ChargeButton(
     enabled: Boolean,
+    isLoading: Boolean,
     onClick: () -> Unit,
 ) {
     Button(
@@ -289,16 +303,18 @@ private fun ChargeButton(
                 .fillMaxWidth()
                 .height(56.dp),
     ) {
-        Text(
-            text = stringResource(R.string.charge),
-            fontSize = 18.sp,
-            fontWeight = FontWeight.SemiBold,
-        )
+        if (isLoading) {
+            CircularProgressIndicator(
+                modifier = Modifier.height(24.dp),
+                strokeWidth = 2.dp,
+                color = Color.White,
+            )
+        } else {
+            Text(
+                text = stringResource(R.string.charge),
+                fontSize = 18.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
     }
-}
-
-@Preview(showBackground = true)
-@Composable
-private fun ChargeScreenPreview() {
-    PosTheme { ChargeScreen() }
 }

@@ -4,6 +4,8 @@ import com.possatstack.app.wallet.OnChainWalletEngine
 import com.possatstack.app.wallet.bitcoin.BdkOnChainEngine
 import com.possatstack.app.wallet.chain.ChainDataSource
 import com.possatstack.app.wallet.chain.EsploraChainDataSource
+import com.possatstack.app.wallet.payment.DefaultPaymentOrchestrator
+import com.possatstack.app.wallet.payment.PaymentOrchestrator
 import com.possatstack.app.wallet.signer.AndroidBiometricAuthenticator
 import com.possatstack.app.wallet.signer.AndroidKeystoreSignerSecretStore
 import com.possatstack.app.wallet.signer.BdkSeedSigner
@@ -71,4 +73,14 @@ abstract class WalletModule {
     @Binds
     @Singleton
     abstract fun bindBiometricAuthenticator(impl: AndroidBiometricAuthenticator): BiometricAuthenticator
+
+    /**
+     * Top-level payment orchestrator. Consumed by the cobrança UI
+     * (`ChargeViewModel`, `ChargeDetailsViewModel`); wraps
+     * [OnChainWalletEngine] today and will wrap future `LightningEngine`
+     * / `BearerMethodEngine` in Fase 5.
+     */
+    @Binds
+    @Singleton
+    abstract fun bindPaymentOrchestrator(impl: DefaultPaymentOrchestrator): PaymentOrchestrator
 }

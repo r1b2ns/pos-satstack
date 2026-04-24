@@ -51,6 +51,15 @@ android {
         compose = true
         buildConfig = true
     }
+
+    testOptions {
+        unitTests {
+            // Return default values (0/null) from unmocked android.* calls so
+            // code that logs via android.util.Log doesn't blow up in plain
+            // JVM unit tests.
+            isReturnDefaultValues = true
+        }
+    }
 }
 
 dependencies {
