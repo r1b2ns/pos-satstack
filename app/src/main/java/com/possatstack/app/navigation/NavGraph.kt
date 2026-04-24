@@ -7,14 +7,15 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.CenterAlignedTopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -26,7 +27,6 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
-import androidx.compose.runtime.remember
 import com.possatstack.app.R
 import com.possatstack.app.ui.charge.ChargeScreen
 import com.possatstack.app.ui.components.SyncProgressToast
@@ -53,13 +53,15 @@ fun AppNavGraph(navController: NavHostController) {
     // Show back button on every destination except Home.
     // Wrapped in remember(currentBackStackEntry) so it recalculates on every
     // navigation event, not just on initial composition.
-    val canNavigateBack = remember(currentBackStackEntry) {
-        navController.previousBackStackEntry != null
-    }
+    val canNavigateBack =
+        remember(currentBackStackEntry) {
+            navController.previousBackStackEntry != null
+        }
 
-    val isChargeRoute = remember(currentBackStackEntry) {
-        currentBackStackEntry?.destination?.route?.contains("Charge") == true
-    }
+    val isChargeRoute =
+        remember(currentBackStackEntry) {
+            currentBackStackEntry?.destination?.route?.contains("Charge") == true
+        }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
@@ -94,13 +96,14 @@ fun AppNavGraph(navController: NavHostController) {
                             }
                         }
                     },
-                    colors = if (isChargeRoute) {
-                        TopAppBarDefaults.centerAlignedTopAppBarColors(
-                            containerColor = Color.White,
-                        )
-                    } else {
-                        TopAppBarDefaults.centerAlignedTopAppBarColors()
-                    },
+                    colors =
+                        if (isChargeRoute) {
+                            TopAppBarDefaults.centerAlignedTopAppBarColors(
+                                containerColor = Color.White,
+                            )
+                        } else {
+                            TopAppBarDefaults.centerAlignedTopAppBarColors()
+                        },
                 )
             },
         ) { innerPadding ->
@@ -163,9 +166,10 @@ fun AppNavGraph(navController: NavHostController) {
         // Shown on top of every screen while a sync is running.
         SyncProgressToast(
             progress = walletState.syncProgress,
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(bottom = 72.dp),
+            modifier =
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 72.dp),
         )
     }
 }

@@ -2,13 +2,15 @@ package com.possatstack.app.ui.wallet
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.possatstack.app.wallet.OnChainWalletEngine
 import com.possatstack.app.wallet.SyncProgress
+import com.possatstack.app.wallet.WalletBackup
+import com.possatstack.app.wallet.WalletError
 import com.possatstack.app.wallet.WalletNetwork
-import com.possatstack.app.wallet.WalletRepository
 import com.possatstack.app.wallet.WalletTransaction
-import com.possatstack.app.wallet.storage.WalletStorage
-import com.possatstack.app.util.AppLogger
+import com.possatstack.app.wallet.signer.BiometricAuthenticator
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -18,185 +20,192 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
-class WalletViewModel @Inject constructor(
-    private val walletRepository: WalletRepository,
-    private val walletStorage: WalletStorage,
-) : ViewModel() {
+class WalletViewModel
+    @Inject
+    constructor(
+        private val engine: OnChainWalletEngine,
+        private val authenticator: BiometricAuthenticator,
+    ) : ViewModel() {
+        data class State(
+            val isLoading: Boolean = false,
+            val hasWallet: Boolean = false,
+            val receiveAddress: String? = null,
+            val errorMessage: String? = null,
+            val balanceSats: Long? = null,
+            val syncProgress: SyncProgress = SyncProgress.Idle,
+            val transactions: List<WalletTransaction> = emptyList(),
+            val network: WalletNetwork? = null,
+            /** Populated by [loadMnemonic]; cleared by [clearMnemonicFromState]. */
+            val mnemonic: String? = null,
+        )
 
-    data class State(
-        val isLoading: Boolean = false,
-        val hasWallet: Boolean = false,
-        val receiveAddress: String? = null,
-        val errorMessage: String? = null,
-        val balanceSats: Long? = null,
-        val syncProgress: SyncProgress = SyncProgress.Idle,
-        val transactions: List<WalletTransaction> = emptyList(),
-        val network: WalletNetwork? = null,
-    )
+        private val _state = MutableStateFlow(State())
+        val state: StateFlow<State> = _state.asStateFlow()
 
-    private val _state = MutableStateFlow(State())
-    val state: StateFlow<State> = _state.asStateFlow()
+        init {
+            initWallet()
+        }
 
-    init {
-        initWallet()
-    }
-
-    /** Loads the wallet from storage into memory if one exists, then auto-syncs. */
-    private fun initWallet() {
-        viewModelScope.launch {
-            val descriptor = walletStorage.load() ?: run {
-                _state.update { it.copy(hasWallet = false) }
-                return@launch
+        private fun initWallet() {
+            viewModelScope.launch {
+                if (!engine.hasWallet()) {
+                    _state.update { it.copy(hasWallet = false) }
+                    return@launch
+                }
+                _state.update { it.copy(isLoading = true) }
+                runCatching { engine.loadWallet() }
+                    .onSuccess {
+                        val network = runCatching { engine.getNetwork() }.getOrNull()
+                        _state.update {
+                            it.copy(isLoading = false, hasWallet = true, network = network)
+                        }
+                        syncWallet()
+                    }
+                    .onFailure { exception ->
+                        _state.update { it.copy(isLoading = false, errorMessage = exception.message) }
+                    }
             }
-            _state.update { it.copy(isLoading = true) }
-            runCatching { walletRepository.loadWallet(descriptor) }
-                .onSuccess {
+        }
+
+        fun createWallet() {
+            viewModelScope.launch {
+                _state.update { it.copy(isLoading = true) }
+                runCatching { engine.createWallet(WalletNetwork.SIGNET) }
+                    .onSuccess {
+                        val network = runCatching { engine.getNetwork() }.getOrNull()
+                        _state.update {
+                            it.copy(isLoading = false, hasWallet = true, network = network)
+                        }
+                        syncWallet()
+                    }
+                    .onFailure { exception ->
+                        _state.update { it.copy(isLoading = false, errorMessage = exception.message) }
+                    }
+            }
+        }
+
+        fun deleteWallet() {
+            viewModelScope.launch {
+                runCatching { engine.deleteWallet() }
+                _state.value = State(hasWallet = false)
+            }
+        }
+
+        fun importWallet(mnemonic: String) {
+            viewModelScope.launch {
+                _state.update { it.copy(isLoading = true) }
+                val mnemonicChars = mnemonic.toCharArray()
+                try {
+                    engine.importWallet(WalletBackup.Bip39(mnemonicChars, WalletNetwork.SIGNET))
+                    val network = runCatching { engine.getNetwork() }.getOrNull()
                     _state.update {
-                        it.copy(isLoading = false, hasWallet = true, network = descriptor.network)
+                        it.copy(isLoading = false, hasWallet = true, network = network)
                     }
                     syncWallet()
+                } catch (exception: WalletError) {
+                    _state.update { it.copy(isLoading = false, errorMessage = exception.message) }
+                } catch (exception: Exception) {
+                    _state.update { it.copy(isLoading = false, errorMessage = exception.message) }
+                } finally {
+                    mnemonicChars.fill('\u0000')
                 }
-                .onFailure { e ->
-                    _state.update { it.copy(isLoading = false, errorMessage = e.message) }
-                }
+            }
         }
-    }
 
-    fun createWallet() {
-        viewModelScope.launch {
-            _state.update { it.copy(isLoading = true) }
-            runCatching { walletRepository.createWallet(WalletNetwork.SIGNET) }
-                .onSuccess { descriptor ->
-                    walletStorage.save(descriptor)
-                    _state.update {
-                        it.copy(isLoading = false, hasWallet = true, network = descriptor.network)
+        fun loadReceiveAddress() {
+            viewModelScope.launch {
+                _state.update { it.copy(isLoading = true, receiveAddress = null) }
+                runCatching { engine.getNewReceiveAddress() }
+                    .onSuccess { address ->
+                        _state.update { it.copy(isLoading = false, receiveAddress = address.value) }
                     }
-                    syncWallet()
-                }
-                .onFailure { e ->
-                    _state.update { it.copy(isLoading = false, errorMessage = e.message) }
-                }
-        }
-    }
-
-    fun deleteWallet() {
-        walletStorage.clear()
-        _state.update { State(hasWallet = false) }
-    }
-
-    fun importWallet(mnemonic: String) {
-        viewModelScope.launch {
-            _state.update { it.copy(isLoading = true) }
-            runCatching { walletRepository.importWallet(mnemonic, WalletNetwork.SIGNET) }
-                .onSuccess { descriptor ->
-                    walletStorage.save(descriptor)
-                    _state.update {
-                        it.copy(isLoading = false, hasWallet = true, network = descriptor.network)
+                    .onFailure { exception ->
+                        _state.update { it.copy(isLoading = false, errorMessage = exception.message) }
                     }
-                    syncWallet()
-                }
-                .onFailure { e ->
-                    _state.update { it.copy(isLoading = false, errorMessage = e.message) }
-                }
-        }
-    }
-
-    fun loadReceiveAddress() {
-        viewModelScope.launch {
-            _state.update { it.copy(isLoading = true, receiveAddress = null) }
-            runCatching { walletRepository.getNewReceiveAddress() }
-                .onSuccess { address ->
-                    _state.update { it.copy(isLoading = false, receiveAddress = address.value) }
-                }
-                .onFailure { e ->
-                    _state.update { it.copy(isLoading = false, errorMessage = e.message) }
-                }
-        }
-    }
-
-    /**
-     * Synchronises the wallet with the Electrum network.
-     *
-     * Determines automatically whether a full scan or incremental sync is needed
-     * based on whether a full scan has been completed before for this wallet.
-     *
-     * The [State.syncProgress] field is updated throughout so the UI can show an
-     * appropriate indicator. The indicator is removed (set to [SyncProgress.Idle])
-     * only after the job finishes (successfully or with an error).
-     */
-    fun syncWallet() {
-        val descriptor = walletStorage.load() ?: return
-        viewModelScope.launch {
-            val isFullScan = !walletStorage.isFullScanDone()
-            runSync(descriptor.network, isFullScan)
-        }
-    }
-
-    private suspend fun runSync(network: WalletNetwork, isFullScan: Boolean) {
-        if (isFullScan) {
-            runFullScan(network)
-        } else {
-            runIncrementalSync(network)
-        }
-    }
-
-    private suspend fun runFullScan(network: WalletNetwork) {
-        _state.update { it.copy(syncProgress = SyncProgress.FullScan) }
-        runCatching { walletRepository.syncWallet(network, isFullScan = true) }
-            .onSuccess {
-                walletStorage.markFullScanDone()
-                loadBalanceAfterSync()
-            }
-            .onFailure { e ->
-                _state.update { it.copy(syncProgress = SyncProgress.Idle, errorMessage = e.message) }
-            }
-    }
-
-    private suspend fun runIncrementalSync(network: WalletNetwork) {
-        // Animate progress from 0 → 90 % while the blocking sync call runs,
-        // then jump to 100 % when it completes.
-        _state.update { it.copy(syncProgress = SyncProgress.Syncing(0)) }
-
-        var progressPercent = 0
-        val progressJob = viewModelScope.launch {
-            while (progressPercent < 90) {
-                delay(700)
-                progressPercent = minOf(progressPercent + 15, 90)
-                _state.update { it.copy(syncProgress = SyncProgress.Syncing(progressPercent)) }
             }
         }
 
-        runCatching { walletRepository.syncWallet(network, isFullScan = false) }
-            .also { progressJob.cancel() }
-            .onSuccess {
-                _state.update { it.copy(syncProgress = SyncProgress.Syncing(100)) }
-                loadBalanceAfterSync()
-            }
-            .onFailure { e ->
-                _state.update { it.copy(syncProgress = SyncProgress.Idle, errorMessage = e.message) }
-            }
-    }
+        fun syncWallet() {
+            viewModelScope.launch {
+                if (!engine.hasWallet()) return@launch
 
-    fun loadTransactions() {
-        viewModelScope.launch {
-            runCatching { walletRepository.getTransactions() }
-                .onSuccess { transactions ->
-                    _state.update { it.copy(transactions = transactions) }
+                _state.update { it.copy(syncProgress = SyncProgress.Syncing(0)) }
+
+                var progressPercent = 0
+                val progressJob: Job =
+                    viewModelScope.launch {
+                        while (progressPercent < 90) {
+                            delay(700)
+                            progressPercent = minOf(progressPercent + 15, 90)
+                            _state.update { it.copy(syncProgress = SyncProgress.Syncing(progressPercent)) }
+                        }
+                    }
+
+                runCatching {
+                    engine.sync { progress ->
+                        _state.update { it.copy(syncProgress = progress) }
+                    }
                 }
+                    .also { progressJob.cancel() }
+                    .onSuccess {
+                        _state.update { it.copy(syncProgress = SyncProgress.Syncing(100)) }
+                        loadBalanceAfterSync()
+                    }
+                    .onFailure { exception ->
+                        _state.update {
+                            it.copy(syncProgress = SyncProgress.Idle, errorMessage = exception.message)
+                        }
+                    }
+            }
+        }
+
+        fun loadTransactions() {
+            viewModelScope.launch {
+                runCatching { engine.getTransactions() }
+                    .onSuccess { transactions ->
+                        _state.update { it.copy(transactions = transactions) }
+                    }
+            }
+        }
+
+        /**
+         * Read the mnemonic from [com.possatstack.app.wallet.signer.SignerSecretStore]
+         * and publish it into [State.mnemonic]. Call [clearMnemonicFromState] when
+         * the seed-phrase screen is dismissed so the plaintext doesn't linger in
+         * memory.
+         */
+        fun loadMnemonic() {
+            viewModelScope.launch {
+                runCatching { engine.exportBackup(authenticator) }
+                    .onSuccess { backup ->
+                        val bip39 = backup as? WalletBackup.Bip39 ?: return@launch
+                        val mnemonicString = String(bip39.mnemonic)
+                        bip39.mnemonic.fill('\u0000')
+                        _state.update { it.copy(mnemonic = mnemonicString) }
+                    }
+                    .onFailure { exception ->
+                        _state.update { it.copy(errorMessage = exception.message) }
+                    }
+            }
+        }
+
+        fun clearMnemonicFromState() {
+            _state.update { it.copy(mnemonic = null) }
+        }
+
+        private suspend fun loadBalanceAfterSync() {
+            val balance = runCatching { engine.getBalance() }.getOrNull()
+            val transactions = runCatching { engine.getTransactions() }.getOrElse { emptyList() }
+            _state.update {
+                it.copy(
+                    syncProgress = SyncProgress.Idle,
+                    balanceSats = balance?.totalSats,
+                    transactions = transactions,
+                )
+            }
+        }
+
+        fun clearError() {
+            _state.update { it.copy(errorMessage = null) }
         }
     }
-
-    private suspend fun loadBalanceAfterSync() {
-        val balance = runCatching { walletRepository.getBalance() }.getOrNull()
-        val transactions = runCatching { walletRepository.getTransactions() }.getOrElse { emptyList() }
-        _state.update {
-            it.copy(syncProgress = SyncProgress.Idle, balanceSats = balance, transactions = transactions)
-        }
-    }
-
-    fun getMnemonic(): String? = walletStorage.load()?.mnemonic
-
-    fun clearError() {
-        _state.update { it.copy(errorMessage = null) }
-    }
-}

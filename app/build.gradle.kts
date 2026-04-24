@@ -19,6 +19,12 @@ android {
         versionCode = 1
         versionName = "0.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // Identifier recorded in WalletStorage to detect dev-time backend swaps.
+        // When this value changes between builds, BdkOnChainEngine wipes the
+        // bdk/ cache and forces a fresh full-scan. Mnemonic and LDK state are
+        // never touched by the swap.
+        buildConfigField("String", "CHAIN_BACKEND", "\"esplora\"")
     }
 
     buildTypes {
@@ -57,7 +63,10 @@ dependencies {
     implementation(libs.androidx.material3)
     implementation(libs.androidx.material.icons.extended)
     implementation(libs.androidx.navigation.compose)
+    // Chain backend ativo: Esplora via BDK (EsploraClient embutido em bdk-android)
     implementation(libs.bdk.android)
+    // implementation(libs.bdk.kyoto)   // ao trocar para Kyoto
+    // implementation(libs.floresta)    // ao trocar para Floresta
     implementation(libs.zxing.core)
     implementation(libs.androidx.security.crypto)
     implementation(libs.kotlinx.serialization.json)

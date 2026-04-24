@@ -1,13 +1,14 @@
 package com.possatstack.app.ui.wallet
 
 import com.possatstack.app.MainDispatcherRule
+import com.possatstack.app.wallet.Balance
 import com.possatstack.app.wallet.BitcoinAddress
-import com.possatstack.app.wallet.FakeWalletRepository
+import com.possatstack.app.wallet.FakeOnChainWalletEngine
 import com.possatstack.app.wallet.SyncProgress
-import com.possatstack.app.wallet.WalletDescriptor
+import com.possatstack.app.wallet.WalletBackup
 import com.possatstack.app.wallet.WalletNetwork
 import com.possatstack.app.wallet.WalletTransaction
-import com.possatstack.app.wallet.storage.FakeWalletStorage
+import com.possatstack.app.wallet.signer.NoOpBiometricAuthenticator
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
@@ -21,272 +22,298 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class WalletViewModelTest {
-
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
 
-    private val sampleDescriptor = WalletDescriptor(
-        externalDescriptor = "external",
-        internalDescriptor = "internal",
-        network = WalletNetwork.SIGNET,
-        mnemonic = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",
-    )
-
-    private fun newViewModel(
-        repository: FakeWalletRepository = FakeWalletRepository(),
-        storage: FakeWalletStorage = FakeWalletStorage(),
-    ): WalletViewModel = WalletViewModel(repository, storage)
+    private fun newViewModel(engine: FakeOnChainWalletEngine = FakeOnChainWalletEngine()): WalletViewModel =
+        WalletViewModel(engine, NoOpBiometricAuthenticator())
 
     @Test
-    fun `init with no stored wallet sets hasWallet to false`() = runTest {
-        val viewModel = newViewModel()
-        advanceUntilIdle()
+    fun `init with no stored wallet sets hasWallet to false`() =
+        runTest {
+            val viewModel = newViewModel()
+            advanceUntilIdle()
 
-        val state = viewModel.state.value
-        assertFalse(state.hasWallet)
-        assertFalse(state.isLoading)
-    }
-
-    @Test
-    fun `init with stored wallet loads it and triggers a full scan sync`() = runTest {
-        val repository = FakeWalletRepository().apply {
-            balanceResult = Result.success(12345L)
-        }
-        val storage = FakeWalletStorage().apply { preload(sampleDescriptor) }
-
-        val viewModel = newViewModel(repository, storage)
-        advanceUntilIdle()
-
-        val state = viewModel.state.value
-        assertTrue(state.hasWallet)
-        assertFalse(state.isLoading)
-        assertEquals(WalletNetwork.SIGNET, state.network)
-        assertEquals(1, repository.loadCount)
-        assertEquals(listOf(WalletNetwork.SIGNET to true), repository.syncCallsArgs)
-        assertEquals(1, storage.markFullScanDoneCount)
-        assertEquals(12345L, state.balanceSats)
-        assertEquals(SyncProgress.Idle, state.syncProgress)
-    }
-
-    @Test
-    fun `init with stored wallet and full scan already done runs incremental sync`() = runTest {
-        val repository = FakeWalletRepository()
-        val storage = FakeWalletStorage().apply {
-            preload(sampleDescriptor)
-            preloadFullScanDone()
+            val state = viewModel.state.value
+            assertFalse(state.hasWallet)
+            assertFalse(state.isLoading)
         }
 
-        val viewModel = newViewModel(repository, storage)
-        advanceUntilIdle()
-
-        assertEquals(listOf(WalletNetwork.SIGNET to false), repository.syncCallsArgs)
-        // full scan flag should not be set again
-        assertEquals(0, storage.markFullScanDoneCount)
-        assertEquals(SyncProgress.Idle, viewModel.state.value.syncProgress)
-    }
-
     @Test
-    fun `init surfaces error when loadWallet fails`() = runTest {
-        val repository = FakeWalletRepository().apply {
-            loadWalletResult = Result.failure(RuntimeException("boom"))
+    fun `init with stored wallet loads it and triggers a sync`() =
+        runTest {
+            val engine =
+                FakeOnChainWalletEngine().apply {
+                    hasWalletValue = true
+                    network = WalletNetwork.SIGNET
+                    balanceResult = Result.success(Balance(12345L, 0, 0))
+                }
+
+            val viewModel = newViewModel(engine)
+            advanceUntilIdle()
+
+            val state = viewModel.state.value
+            assertTrue(state.hasWallet)
+            assertFalse(state.isLoading)
+            assertEquals(WalletNetwork.SIGNET, state.network)
+            assertEquals(1, engine.loadWalletCount)
+            assertEquals(1, engine.syncCount)
+            assertEquals(12345L, state.balanceSats)
+            assertEquals(SyncProgress.Idle, state.syncProgress)
         }
-        val storage = FakeWalletStorage().apply { preload(sampleDescriptor) }
-
-        val viewModel = newViewModel(repository, storage)
-        advanceUntilIdle()
-
-        val state = viewModel.state.value
-        assertFalse(state.hasWallet)
-        assertFalse(state.isLoading)
-        assertEquals("boom", state.errorMessage)
-        assertTrue(repository.syncCallsArgs.isEmpty())
-    }
 
     @Test
-    fun `createWallet persists descriptor and triggers sync on success`() = runTest {
-        val repository = FakeWalletRepository()
-        val storage = FakeWalletStorage()
-        val viewModel = newViewModel(repository, storage)
-        advanceUntilIdle()
+    fun `init surfaces error when loadWallet fails`() =
+        runTest {
+            val engine =
+                FakeOnChainWalletEngine().apply {
+                    hasWalletValue = true
+                    loadWalletResult = Result.failure(RuntimeException("boom"))
+                }
 
-        viewModel.createWallet()
-        advanceUntilIdle()
+            val viewModel = newViewModel(engine)
+            advanceUntilIdle()
 
-        val state = viewModel.state.value
-        assertEquals(1, repository.createCount)
-        assertEquals(1, storage.saveCount)
-        assertTrue(state.hasWallet)
-        assertEquals(WalletNetwork.SIGNET, state.network)
-        assertEquals(listOf(WalletNetwork.SIGNET to true), repository.syncCallsArgs)
-    }
-
-    @Test
-    fun `createWallet surfaces error on failure`() = runTest {
-        val repository = FakeWalletRepository().apply {
-            createWalletResult = Result.failure(IllegalStateException("nope"))
+            val state = viewModel.state.value
+            assertFalse(state.hasWallet)
+            assertFalse(state.isLoading)
+            assertEquals("boom", state.errorMessage)
+            assertEquals(0, engine.syncCount)
         }
-        val storage = FakeWalletStorage()
-        val viewModel = newViewModel(repository, storage)
-        advanceUntilIdle()
-
-        viewModel.createWallet()
-        advanceUntilIdle()
-
-        val state = viewModel.state.value
-        assertFalse(state.hasWallet)
-        assertEquals("nope", state.errorMessage)
-        assertEquals(0, storage.saveCount)
-    }
 
     @Test
-    fun `importWallet persists descriptor and triggers sync on success`() = runTest {
-        val repository = FakeWalletRepository()
-        val storage = FakeWalletStorage()
-        val viewModel = newViewModel(repository, storage)
-        advanceUntilIdle()
+    fun `createWallet delegates to engine and triggers sync on success`() =
+        runTest {
+            val engine = FakeOnChainWalletEngine()
+            val viewModel = newViewModel(engine)
+            advanceUntilIdle()
 
-        viewModel.importWallet("mnemonic words here")
-        advanceUntilIdle()
+            viewModel.createWallet()
+            advanceUntilIdle()
 
-        assertEquals(1, repository.importCount)
-        assertEquals(1, storage.saveCount)
-        assertTrue(viewModel.state.value.hasWallet)
-        assertEquals(listOf(WalletNetwork.SIGNET to true), repository.syncCallsArgs)
-    }
-
-    @Test
-    fun `importWallet surfaces error on failure`() = runTest {
-        val repository = FakeWalletRepository().apply {
-            importWalletResult = Result.failure(IllegalArgumentException("bad seed"))
+            val state = viewModel.state.value
+            assertEquals(1, engine.createWalletCount)
+            assertEquals(listOf(WalletNetwork.SIGNET), engine.createWalletArgs)
+            assertTrue(state.hasWallet)
+            assertEquals(WalletNetwork.SIGNET, state.network)
+            assertEquals(1, engine.syncCount)
         }
-        val viewModel = newViewModel(repository)
-        advanceUntilIdle()
-
-        viewModel.importWallet("invalid")
-        advanceUntilIdle()
-
-        assertEquals("bad seed", viewModel.state.value.errorMessage)
-        assertFalse(viewModel.state.value.hasWallet)
-    }
 
     @Test
-    fun `deleteWallet clears storage and resets state`() = runTest {
-        val storage = FakeWalletStorage().apply { preload(sampleDescriptor) }
-        val viewModel = newViewModel(storage = storage)
-        advanceUntilIdle()
+    fun `createWallet surfaces error on failure`() =
+        runTest {
+            val engine =
+                FakeOnChainWalletEngine().apply {
+                    createWalletResult = Result.failure(IllegalStateException("nope"))
+                }
+            val viewModel = newViewModel(engine)
+            advanceUntilIdle()
 
-        viewModel.deleteWallet()
+            viewModel.createWallet()
+            advanceUntilIdle()
 
-        assertEquals(1, storage.clearCount)
-        assertFalse(viewModel.state.value.hasWallet)
-        assertNull(viewModel.state.value.balanceSats)
-    }
-
-    @Test
-    fun `loadReceiveAddress success updates state with address`() = runTest {
-        val repository = FakeWalletRepository().apply {
-            receiveAddressResult = Result.success(BitcoinAddress("bc1qabcd"))
+            val state = viewModel.state.value
+            assertFalse(state.hasWallet)
+            assertEquals("nope", state.errorMessage)
+            assertEquals(0, engine.syncCount)
         }
-        val viewModel = newViewModel(repository)
-        advanceUntilIdle()
-
-        viewModel.loadReceiveAddress()
-        advanceUntilIdle()
-
-        assertEquals("bc1qabcd", viewModel.state.value.receiveAddress)
-        assertFalse(viewModel.state.value.isLoading)
-    }
 
     @Test
-    fun `loadReceiveAddress failure surfaces error`() = runTest {
-        val repository = FakeWalletRepository().apply {
-            receiveAddressResult = Result.failure(RuntimeException("offline"))
+    fun `importWallet wraps the mnemonic into a Bip39 backup and triggers sync`() =
+        runTest {
+            val engine = FakeOnChainWalletEngine()
+            val viewModel = newViewModel(engine)
+            advanceUntilIdle()
+
+            viewModel.importWallet(
+                "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",
+            )
+            advanceUntilIdle()
+
+            assertEquals(1, engine.importWalletCount)
+            val backup = engine.importWalletBackups.single() as WalletBackup.Bip39
+            assertEquals(WalletNetwork.SIGNET, backup.network)
+            assertTrue(viewModel.state.value.hasWallet)
+            assertEquals(1, engine.syncCount)
         }
-        val viewModel = newViewModel(repository)
-        advanceUntilIdle()
-
-        viewModel.loadReceiveAddress()
-        advanceUntilIdle()
-
-        assertEquals("offline", viewModel.state.value.errorMessage)
-        assertNull(viewModel.state.value.receiveAddress)
-    }
 
     @Test
-    fun `syncWallet does nothing when no wallet is stored`() = runTest {
-        val repository = FakeWalletRepository()
-        val viewModel = newViewModel(repository)
-        advanceUntilIdle()
+    fun `importWallet surfaces error on failure`() =
+        runTest {
+            val engine =
+                FakeOnChainWalletEngine().apply {
+                    importWalletResult = Result.failure(IllegalArgumentException("bad seed"))
+                }
+            val viewModel = newViewModel(engine)
+            advanceUntilIdle()
 
-        viewModel.syncWallet()
-        advanceUntilIdle()
+            viewModel.importWallet("invalid")
+            advanceUntilIdle()
 
-        assertTrue(repository.syncCallsArgs.isEmpty())
-    }
-
-    @Test
-    fun `syncWallet failure on full scan path sets error and idle`() = runTest {
-        val repository = FakeWalletRepository().apply {
-            syncResult = Result.failure(RuntimeException("electrum"))
+            assertEquals("bad seed", viewModel.state.value.errorMessage)
+            assertFalse(viewModel.state.value.hasWallet)
         }
-        val storage = FakeWalletStorage().apply { preload(sampleDescriptor) }
-        val viewModel = newViewModel(repository, storage)
-        advanceUntilIdle()
-
-        val state = viewModel.state.value
-        assertEquals("electrum", state.errorMessage)
-        assertEquals(SyncProgress.Idle, state.syncProgress)
-        assertEquals(0, storage.markFullScanDoneCount)
-    }
 
     @Test
-    fun `loadTransactions updates state on success`() = runTest {
-        val tx = WalletTransaction(
-            txid = "abc",
-            sentSats = 0,
-            receivedSats = 1000,
-            feeSats = null,
-            confirmationTime = null,
-            blockHeight = null,
-            isConfirmed = false,
-        )
-        val repository = FakeWalletRepository().apply {
-            transactionsResult = Result.success(listOf(tx))
+    fun `deleteWallet calls engine and resets state`() =
+        runTest {
+            val engine = FakeOnChainWalletEngine().apply { hasWalletValue = true }
+            val viewModel = newViewModel(engine)
+            advanceUntilIdle()
+
+            viewModel.deleteWallet()
+            advanceUntilIdle()
+
+            assertEquals(1, engine.deleteWalletCount)
+            assertFalse(viewModel.state.value.hasWallet)
+            assertNull(viewModel.state.value.balanceSats)
         }
-        val viewModel = newViewModel(repository)
-        advanceUntilIdle()
-
-        viewModel.loadTransactions()
-        advanceUntilIdle()
-
-        assertEquals(listOf(tx), viewModel.state.value.transactions)
-    }
 
     @Test
-    fun `getMnemonic returns stored mnemonic when wallet exists`() {
-        val storage = FakeWalletStorage().apply { preload(sampleDescriptor) }
-        val viewModel = newViewModel(storage = storage)
+    fun `loadReceiveAddress success updates state with address`() =
+        runTest {
+            val engine =
+                FakeOnChainWalletEngine().apply {
+                    receiveAddressResult = Result.success(BitcoinAddress("bc1qabcd"))
+                }
+            val viewModel = newViewModel(engine)
+            advanceUntilIdle()
 
-        assertEquals(sampleDescriptor.mnemonic, viewModel.getMnemonic())
-    }
+            viewModel.loadReceiveAddress()
+            advanceUntilIdle()
 
-    @Test
-    fun `getMnemonic returns null when no wallet stored`() {
-        val viewModel = newViewModel()
-        assertNull(viewModel.getMnemonic())
-    }
-
-    @Test
-    fun `clearError removes the error message`() = runTest {
-        val repository = FakeWalletRepository().apply {
-            loadWalletResult = Result.failure(RuntimeException("boom"))
+            assertEquals("bc1qabcd", viewModel.state.value.receiveAddress)
+            assertFalse(viewModel.state.value.isLoading)
         }
-        val storage = FakeWalletStorage().apply { preload(sampleDescriptor) }
-        val viewModel = newViewModel(repository, storage)
-        advanceUntilIdle()
-        assertNotNull(viewModel.state.value.errorMessage)
 
-        viewModel.clearError()
-        assertNull(viewModel.state.value.errorMessage)
-    }
+    @Test
+    fun `loadReceiveAddress failure surfaces error`() =
+        runTest {
+            val engine =
+                FakeOnChainWalletEngine().apply {
+                    receiveAddressResult = Result.failure(RuntimeException("offline"))
+                }
+            val viewModel = newViewModel(engine)
+            advanceUntilIdle()
+
+            viewModel.loadReceiveAddress()
+            advanceUntilIdle()
+
+            assertEquals("offline", viewModel.state.value.errorMessage)
+            assertNull(viewModel.state.value.receiveAddress)
+        }
+
+    @Test
+    fun `syncWallet does nothing when no wallet exists`() =
+        runTest {
+            val engine = FakeOnChainWalletEngine()
+            val viewModel = newViewModel(engine)
+            advanceUntilIdle()
+
+            viewModel.syncWallet()
+            advanceUntilIdle()
+
+            // first invocation happens in init — no wallet means zero syncs
+            assertEquals(0, engine.syncCount)
+        }
+
+    @Test
+    fun `syncWallet failure sets error and idle`() =
+        runTest {
+            val engine =
+                FakeOnChainWalletEngine().apply {
+                    hasWalletValue = true
+                    syncResult = Result.failure(RuntimeException("esplora"))
+                }
+            val viewModel = newViewModel(engine)
+            advanceUntilIdle()
+
+            val state = viewModel.state.value
+            assertEquals("esplora", state.errorMessage)
+            assertEquals(SyncProgress.Idle, state.syncProgress)
+        }
+
+    @Test
+    fun `loadTransactions updates state on success`() =
+        runTest {
+            val tx =
+                WalletTransaction(
+                    txid = "abc",
+                    sentSats = 0,
+                    receivedSats = 1000,
+                    feeSats = null,
+                    confirmationTime = null,
+                    blockHeight = null,
+                    isConfirmed = false,
+                )
+            val engine =
+                FakeOnChainWalletEngine().apply {
+                    transactionsResult = Result.success(listOf(tx))
+                }
+            val viewModel = newViewModel(engine)
+            advanceUntilIdle()
+
+            viewModel.loadTransactions()
+            advanceUntilIdle()
+
+            assertEquals(listOf(tx), viewModel.state.value.transactions)
+        }
+
+    @Test
+    fun `loadMnemonic populates state mnemonic and zeroes the backup payload`() =
+        runTest {
+            val originalMnemonic = "foo bar baz"
+            val backupChars = originalMnemonic.toCharArray()
+            val engine =
+                FakeOnChainWalletEngine().apply {
+                    exportBackupResult = { WalletBackup.Bip39(backupChars, WalletNetwork.SIGNET) }
+                }
+            val viewModel = newViewModel(engine)
+            advanceUntilIdle()
+
+            viewModel.loadMnemonic()
+            advanceUntilIdle()
+
+            assertEquals(originalMnemonic, viewModel.state.value.mnemonic)
+            assertTrue(
+                "Backup CharArray should be zeroed after loadMnemonic",
+                backupChars.all { it == '\u0000' },
+            )
+        }
+
+    @Test
+    fun `clearMnemonicFromState clears state mnemonic`() =
+        runTest {
+            val engine =
+                FakeOnChainWalletEngine().apply {
+                    exportBackupResult = {
+                        WalletBackup.Bip39("x y z".toCharArray(), WalletNetwork.SIGNET)
+                    }
+                }
+            val viewModel = newViewModel(engine)
+            advanceUntilIdle()
+
+            viewModel.loadMnemonic()
+            advanceUntilIdle()
+            assertNotNull(viewModel.state.value.mnemonic)
+
+            viewModel.clearMnemonicFromState()
+            assertNull(viewModel.state.value.mnemonic)
+        }
+
+    @Test
+    fun `clearError removes the error message`() =
+        runTest {
+            val engine =
+                FakeOnChainWalletEngine().apply {
+                    hasWalletValue = true
+                    loadWalletResult = Result.failure(RuntimeException("boom"))
+                }
+            val viewModel = newViewModel(engine)
+            advanceUntilIdle()
+            assertNotNull(viewModel.state.value.errorMessage)
+
+            viewModel.clearError()
+            assertNull(viewModel.state.value.errorMessage)
+        }
 }

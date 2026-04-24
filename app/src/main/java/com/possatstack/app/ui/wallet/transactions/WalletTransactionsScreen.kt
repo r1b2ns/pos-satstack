@@ -40,9 +40,7 @@ import java.util.Date
 import java.util.Locale
 
 @Composable
-fun WalletTransactionsScreen(
-    viewModel: WalletViewModel,
-) {
+fun WalletTransactionsScreen(viewModel: WalletViewModel) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
@@ -121,21 +119,24 @@ private fun TransactionItem(
     onClick: () -> Unit,
 ) {
     val isIncoming = transaction.netSats >= 0
-    val icon = if (isIncoming) {
-        Icons.AutoMirrored.Filled.CallReceived
-    } else {
-        Icons.AutoMirrored.Filled.CallMade
-    }
-    val label = if (isIncoming) {
-        stringResource(R.string.transaction_received)
-    } else {
-        stringResource(R.string.transaction_sent)
-    }
-    val amountColor = if (isIncoming) {
-        MaterialTheme.colorScheme.primary
-    } else {
-        MaterialTheme.colorScheme.error
-    }
+    val icon =
+        if (isIncoming) {
+            Icons.AutoMirrored.Filled.CallReceived
+        } else {
+            Icons.AutoMirrored.Filled.CallMade
+        }
+    val label =
+        if (isIncoming) {
+            stringResource(R.string.transaction_received)
+        } else {
+            stringResource(R.string.transaction_sent)
+        }
+    val amountColor =
+        if (isIncoming) {
+            MaterialTheme.colorScheme.primary
+        } else {
+            MaterialTheme.colorScheme.error
+        }
     val amountPrefix = if (isIncoming) "+" else ""
     val amountSats = kotlin.math.abs(transaction.netSats)
 
@@ -145,11 +146,12 @@ private fun TransactionItem(
             Icon(
                 imageVector = icon,
                 contentDescription = label,
-                tint = if (isIncoming) {
-                    MaterialTheme.colorScheme.primary
-                } else {
-                    MaterialTheme.colorScheme.error
-                },
+                tint =
+                    if (isIncoming) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.error
+                    },
             )
         },
         headlineContent = {
@@ -161,9 +163,10 @@ private fun TransactionItem(
                 Text(text = label)
                 Text(
                     text = "$amountPrefix${formatSats(amountSats)}",
-                    style = MaterialTheme.typography.bodyMedium.copy(
-                        fontFamily = FontFamily.Monospace,
-                    ),
+                    style =
+                        MaterialTheme.typography.bodyMedium.copy(
+                            fontFamily = FontFamily.Monospace,
+                        ),
                     color = amountColor,
                 )
             }
@@ -172,9 +175,10 @@ private fun TransactionItem(
             Column {
                 Text(
                     text = transaction.txid,
-                    style = MaterialTheme.typography.bodySmall.copy(
-                        fontFamily = FontFamily.Monospace,
-                    ),
+                    style =
+                        MaterialTheme.typography.bodySmall.copy(
+                            fontFamily = FontFamily.Monospace,
+                        ),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -203,7 +207,10 @@ private fun TransactionItem(
  * explorer for [WalletNetwork.MAINNET]. Falls back to mainnet for
  * any other network.
  */
-private fun buildMempoolUrl(txid: String, network: WalletNetwork?): String {
+private fun buildMempoolUrl(
+    txid: String,
+    network: WalletNetwork?,
+): String {
     return when (network) {
         WalletNetwork.SIGNET -> "https://mempool.space/signet/tx/$txid"
         WalletNetwork.TESTNET -> "https://mempool.space/testnet/tx/$txid"

@@ -12,9 +12,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.automirrored.filled.CallMade
 import androidx.compose.material.icons.automirrored.filled.CallReceived
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Key
@@ -73,9 +73,10 @@ fun WalletScreen(
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState()),
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState()),
         ) {
             // ── Balance card ──────────────────────────────────────────────────
             if (state.hasWallet) {
@@ -151,7 +152,7 @@ fun WalletScreen(
                 icon = Icons.Default.Key,
                 title = stringResource(R.string.wallet_seed_phrase),
                 subtitle = stringResource(R.string.wallet_seed_phrase_subtitle),
-                enabled = state.hasWallet && viewModel.getMnemonic() != null,
+                enabled = state.hasWallet,
                 onClick = { onNavigate(AppDestination.WalletSeedPhrase) },
             )
 
@@ -170,9 +171,10 @@ fun WalletScreen(
 
             if (state.isLoading) {
                 Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(24.dp),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(24.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center,
                 ) {
@@ -251,14 +253,16 @@ private fun BalanceCard(
 ) {
     Card(
         modifier = modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer,
-        ),
+        colors =
+            CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
+            ),
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 16.dp),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Row(
@@ -267,11 +271,12 @@ private fun BalanceCard(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = if (balanceSats != null) {
-                        stringResource(R.string.balance_btc, balanceSats / 100_000_000.0)
-                    } else {
-                        stringResource(R.string.balance_unknown)
-                    },
+                    text =
+                        if (balanceSats != null) {
+                            stringResource(R.string.balance_btc, balanceSats / 100_000_000.0)
+                        } else {
+                            stringResource(R.string.balance_unknown)
+                        },
                     style = MaterialTheme.typography.headlineMedium,
                     fontFamily = FontFamily.Monospace,
                     color = MaterialTheme.colorScheme.onPrimaryContainer,
@@ -308,7 +313,10 @@ private fun BalanceCard(
 }
 
 @Composable
-private fun SectionHeader(title: String, modifier: Modifier = Modifier) {
+private fun SectionHeader(
+    title: String,
+    modifier: Modifier = Modifier,
+) {
     Text(
         text = title,
         style = MaterialTheme.typography.labelMedium,
@@ -328,11 +336,12 @@ private fun WalletListItem(
     isDestructive: Boolean = false,
 ) {
     val contentAlpha = if (enabled) 1f else 0.38f
-    val titleColor = when {
-        !enabled -> MaterialTheme.colorScheme.onSurface.copy(alpha = contentAlpha)
-        isDestructive -> MaterialTheme.colorScheme.error
-        else -> MaterialTheme.colorScheme.onSurface
-    }
+    val titleColor =
+        when {
+            !enabled -> MaterialTheme.colorScheme.onSurface.copy(alpha = contentAlpha)
+            isDestructive -> MaterialTheme.colorScheme.error
+            else -> MaterialTheme.colorScheme.onSurface
+        }
 
     ListItem(
         headlineContent = { Text(text = title, color = titleColor) },
@@ -346,16 +355,18 @@ private fun WalletListItem(
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                tint = when {
-                    !enabled -> MaterialTheme.colorScheme.onSurface.copy(alpha = contentAlpha)
-                    isDestructive -> MaterialTheme.colorScheme.error
-                    else -> MaterialTheme.colorScheme.onSurfaceVariant
-                },
+                tint =
+                    when {
+                        !enabled -> MaterialTheme.colorScheme.onSurface.copy(alpha = contentAlpha)
+                        isDestructive -> MaterialTheme.colorScheme.error
+                        else -> MaterialTheme.colorScheme.onSurfaceVariant
+                    },
             )
         },
         colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surface),
-        modifier = modifier
-            .alpha(contentAlpha)
-            .clickable(enabled = enabled, onClick = onClick),
+        modifier =
+            modifier
+                .alpha(contentAlpha)
+                .clickable(enabled = enabled, onClick = onClick),
     )
 }

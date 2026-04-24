@@ -19,9 +19,7 @@ import com.possatstack.app.navigation.AppDestination
 import com.possatstack.app.ui.theme.PosTheme
 
 @Composable
-fun SettingsScreen(
-    onNavigate: (AppDestination) -> Unit = {},
-) {
+fun SettingsScreen(onNavigate: (AppDestination) -> Unit = {}) {
     LazyColumn(modifier = Modifier.fillMaxSize()) {
         item {
             ListItem(
