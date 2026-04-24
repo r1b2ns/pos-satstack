@@ -3,6 +3,7 @@ package com.possatstack.app.wallet.bitcoin
 import android.content.Context
 import com.possatstack.app.util.AppLogger
 import com.possatstack.app.wallet.BitcoinAddress
+import com.possatstack.app.wallet.UnsignedPsbt
 import com.possatstack.app.wallet.WalletDescriptor
 import com.possatstack.app.wallet.WalletNetwork
 import com.possatstack.app.wallet.WalletRepository
@@ -12,15 +13,19 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import org.bitcoindevkit.Address
+import org.bitcoindevkit.Amount
 import org.bitcoindevkit.Bip39Exception
 import org.bitcoindevkit.ChainPosition
 import org.bitcoindevkit.Descriptor
 import org.bitcoindevkit.DescriptorSecretKey
 import org.bitcoindevkit.ElectrumClient
+import org.bitcoindevkit.FeeRate
 import org.bitcoindevkit.KeychainKind
 import org.bitcoindevkit.Mnemonic
 import org.bitcoindevkit.Network
 import org.bitcoindevkit.Persister
+import org.bitcoindevkit.TxBuilder
 import org.bitcoindevkit.Wallet
 import org.bitcoindevkit.WordCount
 import java.io.File
@@ -263,6 +268,41 @@ class BdkWalletRepository @Inject constructor(
                 )
             }
         }
+
+    override suspend fun createUnsignedPsbt(
+        recipient: BitcoinAddress,
+        amountSats: Long,
+        feeRateSatPerVb: Long?,
+    ): UnsignedPsbt = withContext(Dispatchers.IO) {
+        require(amountSats > 0) { "amountSats must be greater than zero (was $amountSats)" }
+        require(feeRateSatPerVb == null || feeRateSatPerVb > 0) {
+            "feeRateSatPerVb must be greater than zero when provided (was $feeRateSatPerVb)"
+        }
+        mutex.withLock {
+            val bdkWallet = requireNotNull(wallet) {
+                "Wallet not initialised. Call createWallet or loadWallet first."
+            }
+            AppLogger.info(
+                TAG,
+                "Building unsigned PSBT — amount=${amountSats}sat, " +
+                    "feeRate=${feeRateSatPerVb?.let { "$it sat/vB" } ?: "default"}",
+            )
+
+            val bdkNetwork = bdkWallet.network()
+            val recipientAddress = Address(recipient.value, bdkNetwork)
+            val recipientScript = recipientAddress.scriptPubkey()
+            val amount = Amount.fromSat(amountSats.toULong())
+
+            var builder: TxBuilder = TxBuilder().addRecipient(recipientScript, amount)
+            if (feeRateSatPerVb != null) {
+                builder = builder.feeRate(FeeRate.fromSatPerVb(feeRateSatPerVb.toULong()))
+            }
+
+            val psbt = builder.finish(bdkWallet)
+            AppLogger.info(TAG, "Unsigned PSBT built successfully")
+            UnsignedPsbt(psbt.serialize())
+        }
+    }
 
     private fun WalletNetwork.toBdkNetwork(): Network =
         when (this) {

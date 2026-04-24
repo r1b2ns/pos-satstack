@@ -58,4 +58,28 @@ interface WalletRepository {
      * Throws [IllegalStateException] if the wallet has not been initialised.
      */
     suspend fun getTransactions(): List<WalletTransaction>
+
+    /**
+     * Builds an **unsigned** PSBT (BIP-174) sending [amountSats] to [recipient].
+     *
+     * The returned PSBT contains all inputs (selected by the wallet's coin
+     * selection algorithm), the recipient output, the change output and the
+     * computed fee. No signatures are produced — the PSBT must be signed by an
+     * external signer before it can be broadcast.
+     *
+     * @param recipient destination address. Must match the wallet's network.
+     * @param amountSats amount to send, in satoshis. Must be greater than zero
+     *   and not exceed the wallet's spendable balance.
+     * @param feeRateSatPerVb desired fee rate in satoshis per virtual byte.
+     *   When null, the wallet falls back to its default fee policy.
+     *
+     * @throws IllegalStateException if the wallet has not been initialised.
+     * @throws IllegalArgumentException if [amountSats] is not positive or if
+     *   [recipient] is not a valid address for the wallet's network.
+     */
+    suspend fun createUnsignedPsbt(
+        recipient: BitcoinAddress,
+        amountSats: Long,
+        feeRateSatPerVb: Long? = null,
+    ): UnsignedPsbt
 }

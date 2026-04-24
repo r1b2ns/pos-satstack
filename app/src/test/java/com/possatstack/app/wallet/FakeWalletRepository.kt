@@ -16,6 +16,7 @@ class FakeWalletRepository : WalletRepository {
     var balanceResult: Result<Long> = Result.success(0L)
     var transactionsResult: Result<List<WalletTransaction>> = Result.success(emptyList())
     var receiveAddressResult: Result<BitcoinAddress> = Result.success(BitcoinAddress("bc1qtest"))
+    var unsignedPsbtResult: Result<UnsignedPsbt> = Result.success(UnsignedPsbt("cHNidP8BAA=="))
 
     var createCount = 0
     var importCount = 0
@@ -24,6 +25,7 @@ class FakeWalletRepository : WalletRepository {
     var balanceCount = 0
     var transactionsCount = 0
     var receiveAddressCount = 0
+    val unsignedPsbtCallsArgs = mutableListOf<Triple<BitcoinAddress, Long, Long?>>()
 
     override suspend fun createWallet(network: WalletNetwork): WalletDescriptor {
         createCount++
@@ -58,5 +60,14 @@ class FakeWalletRepository : WalletRepository {
     override suspend fun getTransactions(): List<WalletTransaction> {
         transactionsCount++
         return transactionsResult.getOrThrow()
+    }
+
+    override suspend fun createUnsignedPsbt(
+        recipient: BitcoinAddress,
+        amountSats: Long,
+        feeRateSatPerVb: Long?,
+    ): UnsignedPsbt {
+        unsignedPsbtCallsArgs += Triple(recipient, amountSats, feeRateSatPerVb)
+        return unsignedPsbtResult.getOrThrow()
     }
 }
