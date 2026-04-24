@@ -4,15 +4,16 @@ import com.possatstack.app.wallet.OnChainWalletEngine
 import com.possatstack.app.wallet.bitcoin.BdkOnChainEngine
 import com.possatstack.app.wallet.chain.ChainDataSource
 import com.possatstack.app.wallet.chain.EsploraChainDataSource
+import com.possatstack.app.wallet.signer.AndroidBiometricAuthenticator
 import com.possatstack.app.wallet.signer.AndroidKeystoreSignerSecretStore
+import com.possatstack.app.wallet.signer.BdkSeedSigner
 import com.possatstack.app.wallet.signer.BiometricAuthenticator
-import com.possatstack.app.wallet.signer.NoOpBiometricAuthenticator
+import com.possatstack.app.wallet.signer.Signer
 import com.possatstack.app.wallet.signer.SignerSecretStore
 import com.possatstack.app.wallet.storage.SecureWalletStorage
 import com.possatstack.app.wallet.storage.WalletStorage
 import dagger.Binds
 import dagger.Module
-import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
@@ -53,14 +54,21 @@ abstract class WalletModule {
     @Singleton
     abstract fun bindOnChainWalletEngine(impl: BdkOnChainEngine): OnChainWalletEngine
 
-    companion object {
-        /**
-         * No-op authenticator for Fase 1–2. Once Fase 3 extracts the Signer
-         * and wires BiometricPrompt, swap this provider for an
-         * activity-backed implementation.
-         */
-        @Provides
-        @Singleton
-        fun provideBiometricAuthenticator(): BiometricAuthenticator = NoOpBiometricAuthenticator()
-    }
+    /**
+     * PSBT signer. Today only the in-app seed; Fase 5 will introduce
+     * `TapsignerNfcSigner` and friends, either as additional `@Binds` with
+     * qualifiers or by returning a list of signers the user picks from.
+     */
+    @Binds
+    @Singleton
+    abstract fun bindSigner(impl: BdkSeedSigner): Signer
+
+    /**
+     * Biometric prompt implementation. Uses [androidx.biometric.BiometricPrompt]
+     * through [com.possatstack.app.wallet.signer.ActivityHolder] so it stays
+     * activity-agnostic from the caller's perspective.
+     */
+    @Binds
+    @Singleton
+    abstract fun bindBiometricAuthenticator(impl: AndroidBiometricAuthenticator): BiometricAuthenticator
 }

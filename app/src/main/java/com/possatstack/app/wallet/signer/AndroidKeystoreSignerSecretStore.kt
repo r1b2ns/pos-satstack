@@ -2,8 +2,7 @@ package com.possatstack.app.wallet.signer
 
 import android.app.KeyguardManager
 import android.content.Context
-import android.os.Build
-import android.security.keystore.StrongBoxUnavailableException
+import android.security.keystore.UserNotAuthenticatedException
 import androidx.core.content.edit
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
@@ -23,23 +22,22 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Android [SignerSecretStore] backed by [EncryptedSharedPreferences] on a
- * dedicated prefs file, with a [MasterKey] that prefers StrongBox when the
- * hardware provides it.
+ * Android [SignerSecretStore] with two-layer protection for the mnemonic:
  *
- * Notes on the current implementation:
- *  - `setUserAuthenticationRequired` is NOT enabled yet. Enabling it requires
- *    wiring a real `BiometricPrompt` (a `FragmentActivity`) into the read
- *    path — that lives in Fase 3 when the [Signer] is extracted. The shape
- *    is already in place ([readMnemonic] takes a [BiometricAuthenticator])
- *    so Fase 3 only needs to swap the authenticator binding and rebuild the
- *    master key with auth-required.
- *  - The prefs file is separate from `wallet_secure_prefs` so the mnemonic
- *    can be hardened independently of descriptors/cache.
- *  - Mnemonic is persisted as a UTF-8 byte array (base64 in SharedPreferences,
- *    because prefs only take strings). The transient [CharArray] and
- *    [ByteArray] used during encode/decode are zeroed before the function
- *    returns.
+ *  1. The **prefs file** (`mnemonic_secure_prefs`) is encrypted at rest with
+ *     an [EncryptedSharedPreferences] instance backed by a non-auth-required
+ *     [MasterKey]. It stores metadata (network, presence flag) and the
+ *     mnemonic ciphertext blob. Reads of metadata do not prompt the user.
+ *
+ *  2. The **mnemonic payload itself** is wrapped a second time by a
+ *     [MnemonicCipher] whose underlying AndroidKeyStore key has
+ *     `setUserAuthenticationRequired(true)` with a 30-second validity. Reading
+ *     the plaintext therefore always requires a recent biometric/PIN prompt.
+ *
+ * On cold boot, [readMnemonic] catches [UserNotAuthenticatedException], calls
+ * [BiometricAuthenticator.authenticate] to unlock all time-bound Keystore keys,
+ * and retries once. If the user cancels, [WalletError.SecretStoreUnavailable]
+ * is thrown.
  */
 @Singleton
 class AndroidKeystoreSignerSecretStore
@@ -49,11 +47,11 @@ class AndroidKeystoreSignerSecretStore
     ) : SignerSecretStore {
         private val utf8: Charset = Charset.forName("UTF-8")
 
-        private var cachedPosture: SecurityPosture? = null
-
         private val prefs by lazy {
-            val (masterKey, posture) = buildMasterKeyWithFallback()
-            cachedPosture = posture
+            val masterKey =
+                MasterKey.Builder(context, PREFS_MASTER_KEY_ALIAS)
+                    .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+                    .build()
 
             EncryptedSharedPreferences.create(
                 context,
@@ -64,7 +62,9 @@ class AndroidKeystoreSignerSecretStore
             )
         }
 
-        override fun hasMnemonic(): Boolean = prefs.contains(KEY_MNEMONIC)
+        private val mnemonicCipher: MnemonicCipher by lazy { MnemonicCipher.loadOrCreate() }
+
+        override fun hasMnemonic(): Boolean = prefs.contains(KEY_CIPHERTEXT)
 
         override suspend fun saveMnemonic(
             mnemonic: CharArray,
@@ -73,17 +73,11 @@ class AndroidKeystoreSignerSecretStore
             withContext(Dispatchers.IO) {
                 val bytes = mnemonic.toUtf8Bytes()
                 try {
-                    val encoded = android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
-                    try {
-                        prefs.edit {
-                            putString(KEY_MNEMONIC, encoded)
-                            putString(KEY_NETWORK, network.name)
-                        }
-                    } finally {
-                        // Encoded string cannot be zeroed (String immutable); rely on
-                        // GC. The unencoded bytes below ARE zeroed.
-                        @Suppress("UNUSED_EXPRESSION")
-                        encoded
+                    val envelope = mnemonicCipher.encrypt(bytes)
+                    prefs.edit {
+                        putString(KEY_CIPHERTEXT, envelope.ciphertext)
+                        putString(KEY_IV, envelope.iv)
+                        putString(KEY_NETWORK, network.name)
                     }
                 } finally {
                     bytes.fill(0)
@@ -93,23 +87,12 @@ class AndroidKeystoreSignerSecretStore
 
         override suspend fun readMnemonic(auth: BiometricAuthenticator): CharArray =
             withContext(Dispatchers.IO) {
-                val encoded =
-                    prefs.getString(KEY_MNEMONIC, null)
-                        ?: throw WalletError.NoWallet
-
-                // Fase 3 hook: if the MasterKey is recreated with auth-required
-                // and decryption below throws UserNotAuthenticatedException,
-                // invoke [auth.authenticate(...)] then retry. Today the key is
-                // not gated and the authenticator is a no-op; keeping the
-                // parameter in place so callers are already shaped correctly.
-                @Suppress("UNUSED_EXPRESSION")
-                auth
-
-                val bytes = android.util.Base64.decode(encoded, android.util.Base64.NO_WRAP)
+                val envelope = loadEnvelopeOrThrow()
+                val plaintext = decryptWithRetry(envelope, auth)
                 try {
-                    bytes.toUtf8CharArray()
+                    plaintext.toUtf8CharArray()
                 } finally {
-                    bytes.fill(0)
+                    plaintext.fill(0)
                 }
             }
 
@@ -137,73 +120,61 @@ class AndroidKeystoreSignerSecretStore
             }
         }
 
-        override fun securityPosture(): SecurityPosture {
-            // Touch prefs once so the master key is built and `cachedPosture` is filled.
-            prefs
-            val posture = cachedPosture ?: SecurityPosture.UnknownSoftware
-            return posture.copy(deviceSecure = isDeviceSecure())
+        override fun securityPosture(): SecurityPosture =
+            SecurityPosture(
+                hardwareBacked = true,
+                strongBoxBacked = mnemonicCipher.strongBoxBacked,
+                deviceSecure = isDeviceSecure(),
+            )
+
+        // ─────────────────────────────────────────────────────────────────────
+        //  Internals
+        // ─────────────────────────────────────────────────────────────────────
+
+        private fun loadEnvelopeOrThrow(): MnemonicCipher.Envelope {
+            val ciphertext = prefs.getString(KEY_CIPHERTEXT, null) ?: throw WalletError.NoWallet
+            val iv = prefs.getString(KEY_IV, null) ?: throw WalletError.NoWallet
+            return MnemonicCipher.Envelope(ciphertext = ciphertext, iv = iv)
         }
 
-        // ─────────────────────────────────────────────────────────────────────
-        // Internals
-        // ─────────────────────────────────────────────────────────────────────
-
-        private fun buildMasterKeyWithFallback(): Pair<MasterKey, SecurityPosture> {
-            // Try StrongBox first (hardware-backed, isolated from the main CPU).
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                try {
-                    val strongBoxKey =
-                        MasterKey.Builder(context, MASTER_KEY_ALIAS)
-                            .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-                            .setRequestStrongBoxBacked(true)
-                            .build()
-                    AppLogger.info(TAG, "MasterKey backed by StrongBox")
-                    return strongBoxKey to
-                        SecurityPosture(
-                            hardwareBacked = true,
-                            strongBoxBacked = true,
-                            deviceSecure = isDeviceSecure(),
-                        )
-                } catch (exception: StrongBoxUnavailableException) {
-                    AppLogger.info(TAG, "StrongBox unavailable — falling back to TEE MasterKey")
-                } catch (exception: Exception) {
-                    AppLogger.error(TAG, "StrongBox MasterKey build failed, falling back", exception)
+        /**
+         * Decrypt, catching [UserNotAuthenticatedException] once to surface the
+         * biometric prompt. A second failure is surfaced as [WalletError].
+         */
+        private suspend fun decryptWithRetry(
+            envelope: MnemonicCipher.Envelope,
+            auth: BiometricAuthenticator,
+        ): ByteArray =
+            try {
+                mnemonicCipher.decrypt(envelope)
+            } catch (exception: UserNotAuthenticatedException) {
+                when (val result = auth.authenticate("Access wallet secret")) {
+                    is AuthResult.Authenticated -> {
+                        try {
+                            mnemonicCipher.decrypt(envelope)
+                        } catch (retryException: UserNotAuthenticatedException) {
+                            AppLogger.error(TAG, "Keystore still not authenticated after prompt", retryException)
+                            throw WalletError.SecretStoreUnavailable("auth not registered")
+                        }
+                    }
+                    is AuthResult.Cancelled -> throw WalletError.SecretStoreUnavailable("user cancelled")
+                    is AuthResult.Failed -> throw WalletError.SecretStoreUnavailable(result.reason)
                 }
             }
-
-            // TEE-backed fallback. Still hardware-isolated on most modern devices.
-            val defaultKey =
-                MasterKey.Builder(context, MASTER_KEY_ALIAS)
-                    .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-                    .build()
-
-            // We cannot introspect the final key-info without a direct KeyStore
-            // lookup (MasterKey hides the underlying entry). Assume hardware-backed
-            // when AndroidKeyStore is available, which is always since API 23.
-            return defaultKey to
-                SecurityPosture(
-                    hardwareBacked = true,
-                    strongBoxBacked = false,
-                    deviceSecure = isDeviceSecure(),
-                )
-        }
 
         private fun isDeviceSecure(): Boolean {
             val keyguard = context.getSystemService(Context.KEYGUARD_SERVICE) as? KeyguardManager
             return keyguard?.isDeviceSecure == true
         }
 
-        /** UTF-8 encode [this] without creating an intermediate [String]. */
         private fun CharArray.toUtf8Bytes(): ByteArray {
             val buffer = utf8.encode(CharBuffer.wrap(this))
             val bytes = ByteArray(buffer.remaining())
             buffer.get(bytes)
-            // Zero the encoder's internal buffer (best-effort; it's a direct copy).
             if (buffer.hasArray()) buffer.array().fill(0)
             return bytes
         }
 
-        /** UTF-8 decode without creating an intermediate [String]. */
         private fun ByteArray.toUtf8CharArray(): CharArray {
             val charBuffer = utf8.decode(ByteBuffer.wrap(this))
             val chars = CharArray(charBuffer.remaining())
@@ -212,17 +183,10 @@ class AndroidKeystoreSignerSecretStore
             return chars
         }
 
-        /**
-         * BIP-39 seed derivation: PBKDF2-HMAC-SHA512, 2048 iterations, salt
-         * `"mnemonic" + passphrase`. Returns 64 bytes. The intermediate [PBEKeySpec]
-         * keeps a copy of the mnemonic chars — we clear it afterwards.
-         */
         private fun deriveBip39Seed(
             mnemonic: CharArray,
             passphrase: CharArray,
         ): ByteArray {
-            // BIP-39 requires NFKD-normalised mnemonic and passphrase. Normalisation
-            // builds a String internally; we zero it by re-wrapping as char arrays.
             val normalisedMnemonic = Normalizer.normalize(String(mnemonic), Normalizer.Form.NFKD).toCharArray()
             val normalisedPassphrase = Normalizer.normalize(String(passphrase), Normalizer.Form.NFKD).toCharArray()
 
@@ -232,16 +196,9 @@ class AndroidKeystoreSignerSecretStore
 
             val saltBytes = saltChars.toUtf8Bytes()
 
-            val spec =
-                PBEKeySpec(
-                    normalisedMnemonic,
-                    saltBytes,
-                    BIP39_ITERATIONS,
-                    BIP39_SEED_BITS,
-                )
+            val spec = PBEKeySpec(normalisedMnemonic, saltBytes, BIP39_ITERATIONS, BIP39_SEED_BITS)
             try {
-                val factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA512")
-                return factory.generateSecret(spec).encoded
+                return SecretKeyFactory.getInstance("PBKDF2WithHmacSHA512").generateSecret(spec).encoded
             } finally {
                 spec.clearPassword()
                 normalisedMnemonic.fill('\u0000')
@@ -254,8 +211,9 @@ class AndroidKeystoreSignerSecretStore
         private companion object {
             const val TAG = "SignerSecretStore"
             const val PREFS_FILE = "mnemonic_secure_prefs"
-            const val MASTER_KEY_ALIAS = "pos_satstack_mnemonic_master_key"
-            const val KEY_MNEMONIC = "mnemonic"
+            const val PREFS_MASTER_KEY_ALIAS = "pos_satstack_mnemonic_prefs_master_key"
+            const val KEY_CIPHERTEXT = "mnemonic_ciphertext"
+            const val KEY_IV = "mnemonic_iv"
             const val KEY_NETWORK = "mnemonic_network"
 
             const val BIP39_ITERATIONS = 2048

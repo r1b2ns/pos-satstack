@@ -77,25 +77,18 @@ interface OnChainWalletEngine {
     ): UnsignedPsbt
 
     /**
-     * Sign the PSBT with the wallet's seed. [auth] is consulted if the secret
-     * store demands user presence. In Fase 3 this responsibility moves to a
-     * separate `Signer`; for now the engine signs.
-     */
-    suspend fun signPsbt(
-        psbt: UnsignedPsbt,
-        auth: BiometricAuthenticator,
-    ): SignedPsbt
-
-    /**
      * Submit a finalised signed PSBT to the network and return the resulting
-     * [Txid].
+     * [Txid]. Signing happens outside the engine via a
+     * [com.possatstack.app.wallet.signer.Signer] (software seed, TAPSIGNER,
+     * etc.) — the engine only builds unsigned PSBTs and broadcasts signed ones.
      */
     suspend fun broadcast(signed: SignedPsbt): Txid
 
     /**
      * Produce an **unsigned** replacement PSBT for [txid] at the new fee. RBF
-     * must be enabled on the original transaction. The returned PSBT must
-     * then go through [signPsbt] + [broadcast] like any other send.
+     * must be enabled on the original transaction. The returned PSBT must go
+     * through a [com.possatstack.app.wallet.signer.Signer] and then [broadcast]
+     * like any other send.
      */
     suspend fun bumpFee(
         txid: Txid,
