@@ -8,6 +8,10 @@ sealed interface AppDestination {
     @Serializable
     data object Charge : AppDestination
 
+    /** Details screen for an active charge: QR + payment-status tracking. */
+    @Serializable
+    data class ChargeDetails(val chargeId: String) : AppDestination
+
     @Serializable
     data object Settings : AppDestination
 

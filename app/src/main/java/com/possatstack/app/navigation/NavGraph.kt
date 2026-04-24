@@ -28,6 +28,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import com.possatstack.app.R
+import com.possatstack.app.ui.charge.ChargeDetailsScreen
 import com.possatstack.app.ui.charge.ChargeScreen
 import com.possatstack.app.ui.components.SyncProgressToast
 import com.possatstack.app.ui.settings.SettingsScreen
@@ -113,7 +114,19 @@ fun AppNavGraph(navController: NavHostController) {
                 modifier = Modifier.padding(innerPadding),
             ) {
                 composable<AppDestination.Charge> {
-                    ChargeScreen()
+                    ChargeScreen(
+                        onChargeCreated = { chargeId ->
+                            navController.navigate(AppDestination.ChargeDetails(chargeId)) {
+                                launchSingleTop = true
+                            }
+                        },
+                    )
+                }
+
+                composable<AppDestination.ChargeDetails> {
+                    ChargeDetailsScreen(
+                        onDismiss = { navController.popBackStack() },
+                    )
                 }
 
                 composable<AppDestination.Settings> {

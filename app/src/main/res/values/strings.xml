@@ -9,6 +9,20 @@
     <string name="charge_key_backspace">&lt;</string>
     <string name="settings">Settings</string>
 
+    <!-- Charge details -->
+    <string name="charge_details_missing">Charge not found.</string>
+    <string name="charge_details_done">Done</string>
+    <string name="charge_details_cancel">Cancel charge</string>
+    <string name="charge_details_ln_placeholder">Lightning payload rendering arrives in a future phase.</string>
+    <string name="charge_details_bearer_placeholder">SATSCARD payload rendering arrives in a future phase.</string>
+
+    <string name="charge_status_pending">Waiting for payment…</string>
+    <string name="charge_status_detected">Payment detected — awaiting confirmation</string>
+    <string name="charge_status_confirmed">Payment confirmed</string>
+    <string name="charge_status_cancelled">Charge cancelled</string>
+    <string name="charge_status_expired">Charge expired</string>
+    <string name="charge_status_failed">Payment tracking failed</string>
+
     <!-- Common -->
     <string name="back">Back</string>
     <string name="coming_soon">Coming soon</string>
