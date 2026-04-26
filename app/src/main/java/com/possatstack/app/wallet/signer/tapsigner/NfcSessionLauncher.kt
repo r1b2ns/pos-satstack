@@ -9,8 +9,7 @@ package com.possatstack.app.wallet.signer.tapsigner
  * tag is seen (or [timeoutMs] elapses), and hands it back wrapped.
  *
  * Concrete implementation [AndroidNfcSessionLauncher] uses [ActivityHolder]
- * to reach the current `FragmentActivity` without needing a direct
- * reference.
+ * to reach the current `Activity` without needing a direct reference.
  */
 internal interface NfcSessionLauncher {
     /**

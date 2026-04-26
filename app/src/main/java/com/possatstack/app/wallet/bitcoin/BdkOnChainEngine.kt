@@ -21,7 +21,6 @@ import com.possatstack.app.wallet.WalletNetwork
 import com.possatstack.app.wallet.WalletTransaction
 import com.possatstack.app.wallet.chain.ChainDataSource
 import com.possatstack.app.wallet.chain.ChainSyncProvider
-import com.possatstack.app.wallet.signer.BiometricAuthenticator
 import com.possatstack.app.wallet.signer.SignerSecretStore
 import com.possatstack.app.wallet.storage.WalletStorage
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -165,7 +164,15 @@ class BdkOnChainEngine
 
                         val mnemonicChars = mnemonic.toString().toCharArray()
                         try {
+                            AppLogger.info(TAG, "Persisting mnemonic to signer secret store")
                             signerStore.saveMnemonic(mnemonicChars, network)
+                            AppLogger.info(
+                                TAG,
+                                "Mnemonic persisted; security posture=${signerStore.securityPosture()}",
+                            )
+                        } catch (mnemonicException: Exception) {
+                            AppLogger.error(TAG, "saveMnemonic failed during createWallet", mnemonicException)
+                            throw mnemonicException
                         } finally {
                             mnemonicChars.fill('\u0000')
                         }
@@ -262,10 +269,10 @@ class BdkOnChainEngine
                 }
             }
 
-        override suspend fun exportBackup(auth: BiometricAuthenticator): WalletBackup =
+        override suspend fun exportBackup(): WalletBackup =
             withContext(Dispatchers.IO) {
                 val descriptor = walletStorage.load() ?: throw WalletError.NoWallet
-                val mnemonicChars = signerStore.readMnemonic(auth)
+                val mnemonicChars = signerStore.readMnemonic()
                 WalletBackup.Bip39(mnemonicChars, descriptor.network)
             }
 

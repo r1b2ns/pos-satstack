@@ -8,10 +8,8 @@ import com.possatstack.app.wallet.chain.EsploraChainDataSource
 import com.possatstack.app.wallet.chain.EsploraChainSyncProvider
 import com.possatstack.app.wallet.payment.DefaultPaymentOrchestrator
 import com.possatstack.app.wallet.payment.PaymentOrchestrator
-import com.possatstack.app.wallet.signer.AndroidBiometricAuthenticator
 import com.possatstack.app.wallet.signer.AndroidKeystoreSignerSecretStore
 import com.possatstack.app.wallet.signer.BdkSeedSigner
-import com.possatstack.app.wallet.signer.BiometricAuthenticator
 import com.possatstack.app.wallet.signer.Signer
 import com.possatstack.app.wallet.signer.SignerSecretStore
 import com.possatstack.app.wallet.signer.TapsignerNfcSigner
@@ -111,15 +109,6 @@ abstract class WalletModule {
     @Binds
     @Singleton
     internal abstract fun bindNfcSessionLauncher(impl: AndroidNfcSessionLauncher): NfcSessionLauncher
-
-    /**
-     * Biometric prompt implementation. Uses [androidx.biometric.BiometricPrompt]
-     * through [com.possatstack.app.wallet.signer.ActivityHolder] so it stays
-     * activity-agnostic from the caller's perspective.
-     */
-    @Binds
-    @Singleton
-    abstract fun bindBiometricAuthenticator(impl: AndroidBiometricAuthenticator): BiometricAuthenticator
 
     /**
      * Top-level payment orchestrator. Consumed by the cobrança UI

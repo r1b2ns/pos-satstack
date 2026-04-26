@@ -8,7 +8,6 @@ import com.possatstack.app.wallet.WalletBackup
 import com.possatstack.app.wallet.WalletError
 import com.possatstack.app.wallet.WalletNetwork
 import com.possatstack.app.wallet.WalletTransaction
-import com.possatstack.app.wallet.signer.BiometricAuthenticator
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -24,7 +23,6 @@ class WalletViewModel
     @Inject
     constructor(
         private val engine: OnChainWalletEngine,
-        private val authenticator: BiometricAuthenticator,
     ) : ViewModel() {
         data class State(
             val isLoading: Boolean = false,
@@ -176,7 +174,7 @@ class WalletViewModel
          */
         fun loadMnemonic() {
             viewModelScope.launch {
-                runCatching { engine.exportBackup(authenticator) }
+                runCatching { engine.exportBackup() }
                     .onSuccess { backup ->
                         val bip39 = backup as? WalletBackup.Bip39 ?: return@launch
                         val mnemonicString = String(bip39.mnemonic)

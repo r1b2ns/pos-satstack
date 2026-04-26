@@ -8,7 +8,6 @@ import com.possatstack.app.wallet.SyncProgress
 import com.possatstack.app.wallet.WalletBackup
 import com.possatstack.app.wallet.WalletNetwork
 import com.possatstack.app.wallet.WalletTransaction
-import com.possatstack.app.wallet.signer.NoOpBiometricAuthenticator
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
@@ -26,7 +25,7 @@ class WalletViewModelTest {
     val mainDispatcherRule = MainDispatcherRule()
 
     private fun newViewModel(engine: FakeOnChainWalletEngine = FakeOnChainWalletEngine()): WalletViewModel =
-        WalletViewModel(engine, NoOpBiometricAuthenticator())
+        WalletViewModel(engine)
 
     @Test
     fun `init with no stored wallet sets hasWallet to false`() =

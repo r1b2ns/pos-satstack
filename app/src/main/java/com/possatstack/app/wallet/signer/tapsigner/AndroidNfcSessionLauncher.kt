@@ -12,9 +12,9 @@ import javax.inject.Singleton
 
 /**
  * Production [NfcSessionLauncher] that talks to [NfcAdapter] via reader
- * mode. The currently-resumed `FragmentActivity` is fetched from
- * [ActivityHolder] so this class can live as an app-scoped singleton
- * without holding any Activity reference directly.
+ * mode. The currently-resumed `Activity` is fetched from [ActivityHolder]
+ * so this class can live as an app-scoped singleton without holding any
+ * Activity reference directly.
  *
  * Reader mode is narrower than the generic dispatcher: it routes tags
  * straight to this launcher without triggering the "new tag discovered"
