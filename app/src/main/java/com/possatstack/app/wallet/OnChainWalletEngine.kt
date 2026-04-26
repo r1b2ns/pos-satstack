@@ -1,7 +1,5 @@
 package com.possatstack.app.wallet
 
-import com.possatstack.app.wallet.signer.BiometricAuthenticator
-
 /**
  * Library-agnostic contract for on-chain Bitcoin wallet operations.
  *
@@ -54,10 +52,9 @@ interface OnChainWalletEngine {
 
     /**
      * Export a backup suitable for showing the user (Bip39 mnemonic) or
-     * transferring to another wallet. Accessing the mnemonic payload may
-     * prompt the user via [auth] if the secret store requires it.
+     * transferring to another wallet.
      */
-    suspend fun exportBackup(auth: BiometricAuthenticator): WalletBackup
+    suspend fun exportBackup(): WalletBackup
 
     // ─────────────────────────────────────────────────────────────────
     //  Receiving

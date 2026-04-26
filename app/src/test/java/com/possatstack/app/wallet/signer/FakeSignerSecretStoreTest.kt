@@ -23,7 +23,7 @@ class FakeSignerSecretStoreTest {
         runTest {
             val store = FakeSignerSecretStore()
             try {
-                store.readMnemonic(NoOpBiometricAuthenticator())
+                store.readMnemonic()
                 org.junit.Assert.fail("Expected WalletError.NoWallet")
             } catch (error: WalletError.NoWallet) {
                 assertTrue(error is WalletError)
@@ -37,7 +37,7 @@ class FakeSignerSecretStoreTest {
             val input = "abandon abandon".toCharArray()
             store.saveMnemonic(input, WalletNetwork.SIGNET)
 
-            val read = store.readMnemonic(NoOpBiometricAuthenticator())
+            val read = store.readMnemonic()
             assertArrayEquals("abandon abandon".toCharArray(), read)
             assertEquals(WalletNetwork.SIGNET, store.storedNetwork())
         }

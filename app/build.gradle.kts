@@ -84,8 +84,6 @@ dependencies {
     // implementation(libs.floresta)    // ao trocar para Floresta
     implementation(libs.zxing.core)
     implementation(libs.androidx.security.crypto)
-    implementation(libs.androidx.biometric)
-    implementation(libs.androidx.fragment.ktx)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.hilt.android)
     implementation(libs.hilt.navigation.compose)

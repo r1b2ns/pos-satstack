@@ -1,7 +1,5 @@
 package com.possatstack.app.wallet
 
-import com.possatstack.app.wallet.signer.BiometricAuthenticator
-
 /**
  * Test double for [OnChainWalletEngine]. Every call records a counter so tests
  * can verify interaction; every suspend function honours a [Result] so tests
@@ -86,7 +84,7 @@ class FakeOnChainWalletEngine : OnChainWalletEngine {
         network = null
     }
 
-    override suspend fun exportBackup(auth: BiometricAuthenticator): WalletBackup {
+    override suspend fun exportBackup(): WalletBackup {
         exportBackupCount++
         return exportBackupResult()
     }

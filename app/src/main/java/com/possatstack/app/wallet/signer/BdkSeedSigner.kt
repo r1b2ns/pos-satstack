@@ -25,10 +25,10 @@ import javax.inject.Singleton
  * [Signer] backed by the mnemonic in [SignerSecretStore] and BDK's built-in
  * PSBT signing.
  *
- * Each call reads the mnemonic (through the biometric gate if required),
- * reconstructs a fresh in-memory BDK [Wallet] from the BIP-84 descriptors,
- * signs and finalises the PSBT, and lets the wallet fall out of scope so the
- * Rust objects can be GC'd. The mnemonic char array is zeroed before return.
+ * Each call reads the mnemonic, reconstructs a fresh in-memory BDK [Wallet]
+ * from the BIP-84 descriptors, signs and finalises the PSBT, and lets the
+ * wallet fall out of scope so the Rust objects can be GC'd. The mnemonic
+ * char array is zeroed before return.
  *
  * The engine ([com.possatstack.app.wallet.bitcoin.BdkOnChainEngine]) no longer
  * touches the mnemonic — separation required for future hardware signers
@@ -39,7 +39,6 @@ class BdkSeedSigner
     @Inject
     constructor(
         private val signerStore: SignerSecretStore,
-        private val authenticator: BiometricAuthenticator,
     ) : Signer {
         override val id: String = "seed"
         override val kind: SignerKind = SignerKind.SOFTWARE_SEED
@@ -57,7 +56,7 @@ class BdkSeedSigner
                         "Signing PSBT (recipients=${context.recipients.size}, total=${context.totalSendSats} sat)",
                     )
 
-                    val mnemonicChars = signerStore.readMnemonic(authenticator)
+                    val mnemonicChars = signerStore.readMnemonic()
                     try {
                         buildWalletAndSign(mnemonicChars, context.network, psbt)
                     } finally {

@@ -23,15 +23,12 @@ class FakeSignerSecretStore : SignerSecretStore {
         this.network = network
     }
 
-    override suspend fun readMnemonic(auth: BiometricAuthenticator): CharArray {
+    override suspend fun readMnemonic(): CharArray {
         readCount++
         return mnemonic?.copyOf() ?: throw WalletError.NoWallet
     }
 
-    override suspend fun readSeedBytes(
-        auth: BiometricAuthenticator,
-        passphrase: CharArray,
-    ): ByteArray {
+    override suspend fun readSeedBytes(passphrase: CharArray): ByteArray {
         readSeedCount++
         return mnemonic?.joinToString("").orEmpty().toByteArray()
     }
@@ -40,7 +37,7 @@ class FakeSignerSecretStore : SignerSecretStore {
 
     override suspend fun wipe() {
         wipeCount++
-        mnemonic?.fill('\u0000')
+        mnemonic?.fill(Char(0))
         mnemonic = null
         network = null
     }
