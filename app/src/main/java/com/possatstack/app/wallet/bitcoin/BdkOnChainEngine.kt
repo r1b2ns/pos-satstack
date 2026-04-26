@@ -20,6 +20,7 @@ import com.possatstack.app.wallet.WalletError
 import com.possatstack.app.wallet.WalletNetwork
 import com.possatstack.app.wallet.WalletTransaction
 import com.possatstack.app.wallet.chain.ChainDataSource
+import com.possatstack.app.wallet.chain.ChainSyncProvider
 import com.possatstack.app.wallet.signer.BiometricAuthenticator
 import com.possatstack.app.wallet.signer.SignerSecretStore
 import com.possatstack.app.wallet.storage.WalletStorage
@@ -34,7 +35,6 @@ import org.bitcoindevkit.BumpFeeTxBuilder
 import org.bitcoindevkit.ChainPosition
 import org.bitcoindevkit.Descriptor
 import org.bitcoindevkit.DescriptorSecretKey
-import org.bitcoindevkit.EsploraClient
 import org.bitcoindevkit.FeeRate
 import org.bitcoindevkit.KeychainKind
 import org.bitcoindevkit.Mnemonic
@@ -61,9 +61,10 @@ import org.bitcoindevkit.Txid as BdkTxid
  *    touching the descriptor path.
  *  - Delegates broadcast and fee-estimation to the injected [ChainDataSource]
  *    so swapping Esplora → Kyoto → Floresta later only changes that binding.
- *    Sync/full-scan still go through a BDK-specific [EsploraClient] because
- *    these APIs require BDK scan-request types; that path is rewritten when
- *    the backend actually swaps.
+ *  - Delegates the full-scan / incremental-sync pipeline to the injected
+ *    [ChainSyncProvider]. The provider owns whichever BDK client (Esplora
+ *    HTTP, CBF light client, …) the active backend needs; this engine
+ *    only forwards the wallet handle and the `fullScan` decision.
  *  - Translates every `org.bitcoindevkit.*` exception into a [WalletError]
  *    before re-throwing (see [toWalletError]).
  *
@@ -79,6 +80,7 @@ class BdkOnChainEngine
         private val walletStorage: WalletStorage,
         private val signerStore: SignerSecretStore,
         private val chainDataSource: ChainDataSource,
+        private val chainSyncProvider: ChainSyncProvider,
     ) : OnChainWalletEngine {
         private val mutex = Mutex()
         private var wallet: Wallet? = null
@@ -419,7 +421,8 @@ class BdkOnChainEngine
         override suspend fun getNetwork(): WalletNetwork? = walletStorage.load()?.network
 
         // ─────────────────────────────────────────────────────────────────────
-        //  Sync (BDK-specific — uses EsploraClient directly for fullScan/sync)
+        //  Sync (delegated to ChainSyncProvider so the chosen backend —
+        //  Esplora, Kyoto, Floresta — owns the actual scan logic)
         // ─────────────────────────────────────────────────────────────────────
 
         override suspend fun sync(onProgress: (SyncProgress) -> Unit): Unit =
@@ -429,36 +432,25 @@ class BdkOnChainEngine
                     val activePersister = requireNotNull(persister) { "Persister not initialised" }
                     val network = requireNotNull(walletStorage.load()?.network) { "Network unknown" }
 
-                    val url =
-                        esploraUrlFor(network)
-                            ?: throw WalletError.ChainSourceUnreachable(
-                                IllegalStateException("Esplora not configured for network $network"),
-                            )
-
                     val isFullScan =
                         !walletStorage.isFullScanDone() ||
                             walletStorage.storedChainBackend() != BuildConfig.CHAIN_BACKEND
 
-                    AppLogger.info(TAG, "Sync start (fullScan=$isFullScan, network=$network, url=$url)")
-                    onProgress(if (isFullScan) SyncProgress.FullScan else SyncProgress.Syncing(0))
+                    AppLogger.info(
+                        TAG,
+                        "Sync start (fullScan=$isFullScan, network=$network, backend=${BuildConfig.CHAIN_BACKEND})",
+                    )
 
                     try {
-                        val client = EsploraClient(url)
-                        val update =
-                            if (isFullScan) {
-                                val request = activeWallet.startFullScan().build()
-                                client.fullScan(request, STOP_GAP, PARALLEL_REQUESTS)
-                            } else {
-                                val request = activeWallet.startSyncWithRevealedSpks().build()
-                                client.sync(request, PARALLEL_REQUESTS)
-                            }
-                        activeWallet.applyUpdate(update)
+                        chainSyncProvider.sync(
+                            wallet = activeWallet,
+                            network = network,
+                            fullScan = isFullScan,
+                            onProgress = onProgress,
+                        )
                         activeWallet.persist(activePersister)
-
                         walletStorage.markFullScanDone()
                         walletStorage.markChainBackend(BuildConfig.CHAIN_BACKEND)
-
-                        onProgress(SyncProgress.Idle)
                         AppLogger.info(TAG, "Sync complete")
                     } catch (exception: Exception) {
                         onProgress(SyncProgress.Idle)
@@ -518,18 +510,8 @@ class BdkOnChainEngine
                 WalletNetwork.REGTEST -> Network.REGTEST
             }
 
-        private fun esploraUrlFor(network: WalletNetwork): String? =
-            when (network) {
-                WalletNetwork.MAINNET -> "https://blockstream.info/api"
-                WalletNetwork.SIGNET -> "https://mempool.space/signet/api"
-                WalletNetwork.TESTNET -> "https://blockstream.info/testnet/api"
-                WalletNetwork.REGTEST -> null
-            }
-
         private companion object {
             const val TAG = "BdkOnChainEngine"
             const val DB_FILE_NAME = "bdk_wallet.sqlite3"
-            const val STOP_GAP: ULong = 20u
-            const val PARALLEL_REQUESTS: ULong = 4u
         }
     }

@@ -24,6 +24,10 @@ android {
         // When this value changes between builds, BdkOnChainEngine wipes the
         // bdk/ cache and forces a fresh full-scan. Mnemonic and LDK state are
         // never touched by the swap.
+        //
+        // Active backend: Esplora HTTP. The Kyoto (BIP-157/158 CBF) path is
+        // wired in WalletModule but currently inactive — flip the @Binds and
+        // change this value to "kyoto" to switch.
         buildConfigField("String", "CHAIN_BACKEND", "\"esplora\"")
     }
 
@@ -72,9 +76,11 @@ dependencies {
     implementation(libs.androidx.material3)
     implementation(libs.androidx.material.icons.extended)
     implementation(libs.androidx.navigation.compose)
-    // Chain backend ativo: Esplora via BDK (EsploraClient embutido em bdk-android)
+    // bdk-android 2.3.x fornece tanto EsploraClient (backend Esplora ativo)
+    // quanto CbfBuilder/CbfClient/CbfNode (backend Kyoto, atualmente
+    // inativo mas wired em WalletModule). Uma única artifact serve ambos —
+    // o swap vive em WalletModule.@Binds + CHAIN_BACKEND em defaultConfig.
     implementation(libs.bdk.android)
-    // implementation(libs.bdk.kyoto)   // ao trocar para Kyoto
     // implementation(libs.floresta)    // ao trocar para Floresta
     implementation(libs.zxing.core)
     implementation(libs.androidx.security.crypto)
