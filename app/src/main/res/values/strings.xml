@@ -110,4 +110,29 @@
     <string name="enter_seed_phrase_hint">Enter your 12 or 24 words separated by spaces</string>
     <string name="import_wallet">Import wallet</string>
     <string name="paste">Paste</string>
+
+    <!-- Signer picker -->
+    <string name="signer_picker_title">Choose a signer</string>
+    <string name="signer_picker_subtitle">Which key should sign this transaction?</string>
+    <string name="signer_kind_seed">In-app seed</string>
+    <string name="signer_kind_tapsigner">TAPSIGNER (NFC)</string>
+    <string name="signer_kind_coldcard">Coldcard (airgap)</string>
+    <string name="signer_kind_qr">Airgap QR</string>
+
+    <!-- TAPSIGNER dialog -->
+    <string name="tapsigner_title">Sign with TAPSIGNER</string>
+    <string name="tapsigner_cvc_label">Card code (CVC)</string>
+    <string name="tapsigner_cvc_hint">6 to 8 digits printed on the back of the card</string>
+    <string name="tapsigner_cvc_invalid">Enter 6 to 8 digits</string>
+    <string name="tapsigner_confirm">Continue</string>
+    <string name="tapsigner_awaiting_tap">Hold the card flat against the back of the phone.</string>
+    <string name="tapsigner_exchanging">Talking to the card — keep it steady.</string>
+    <string name="tapsigner_rate_limited">Card is cooling down — wait %1$d seconds before retrying.</string>
+    <string name="tapsigner_done">Signed successfully.</string>
+    <string name="tapsigner_error_generic">Something went wrong.</string>
+    <string name="tapsigner_error_wrong_cvc">Wrong CVC — try again.</string>
+    <string name="tapsigner_error_card_removed">Card left the field before signing finished.</string>
+    <string name="tapsigner_error_not_tapsigner">This tag is not a TAPSIGNER card.</string>
+    <string name="tapsigner_error_timeout">No card detected — try again.</string>
+    <string name="tapsigner_retry">Try again</string>
 </resources>
