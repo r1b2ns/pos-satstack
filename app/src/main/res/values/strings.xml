@@ -139,6 +139,16 @@
     <string name="onboarding_option_create_wallet_title">Create a wallet</string>
     <string name="onboarding_option_create_wallet_subtitle">Less secure — this device will be able to move your funds.</string>
 
+    <!-- Scan QR code -->
+    <string name="scan_qr_title">Scan QR code</string>
+    <string name="scan_qr_no_camera_title">Camera not available</string>
+    <string name="scan_qr_no_camera_message">This device has no camera available. Use the paste option to enter the data manually.</string>
+    <string name="scan_qr_permission_title">Camera permission required</string>
+    <string name="scan_qr_permission_message">Allow camera access to scan QR codes.</string>
+    <string name="scan_qr_grant_permission">Grant access</string>
+    <string name="scan_qr_paste">Paste</string>
+    <string name="scan_qr_paste_empty">Clipboard is empty</string>
+
     <!-- TAPSIGNER dialog -->
     <string name="tapsigner_title">Sign with TAPSIGNER</string>
     <string name="tapsigner_cvc_label">Card code (CVC)</string>

@@ -14,6 +14,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -32,7 +33,9 @@ import com.possatstack.app.ui.charge.ChargeDetailsScreen
 import com.possatstack.app.ui.charge.ChargeScreen
 import com.possatstack.app.ui.components.SyncProgressToast
 import com.possatstack.app.ui.onboarding.OnboardingSetupScreen
+import com.possatstack.app.ui.onboarding.WalletSetupChoice
 import com.possatstack.app.ui.onboarding.WelcomeCarouselScreen
+import com.possatstack.app.ui.scanqrcode.ScanQRCodeScreen
 import com.possatstack.app.ui.settings.SettingsScreen
 import com.possatstack.app.ui.wallet.WalletScreen
 import com.possatstack.app.ui.wallet.WalletViewModel
@@ -138,12 +141,41 @@ fun AppNavGraph(navController: NavHostController) {
                     )
                 }
 
-                composable<AppDestination.OnboardingSetup> {
+                composable<AppDestination.OnboardingSetup> { backStackEntry ->
+                    // Listen for the result returned by the QR-scan module.
+                    // Once consumed we clear the key so re-entering the screen
+                    // (e.g. user backs out and tries again) starts clean.
+                    LaunchedEffect(backStackEntry) {
+                        backStackEntry.savedStateHandle
+                            .getStateFlow<String?>(AppDestination.SCAN_RESULT_KEY, null)
+                            .collect { scanned ->
+                                if (scanned != null) {
+                                    backStackEntry.savedStateHandle
+                                        .remove<String>(AppDestination.SCAN_RESULT_KEY)
+                                    // TODO: persist the imported xpub via WalletViewModel
+                                    // before completing onboarding. For now we just
+                                    // advance to the charge screen.
+                                    navController.navigate(AppDestination.Charge) {
+                                        popUpTo(AppDestination.Welcome) { inclusive = true }
+                                        launchSingleTop = true
+                                    }
+                                }
+                            }
+                    }
+
                     OnboardingSetupScreen(
-                        onContinue = {
-                            navController.navigate(AppDestination.Charge) {
-                                popUpTo(AppDestination.Welcome) { inclusive = true }
-                                launchSingleTop = true
+                        onContinue = { choice ->
+                            when (choice) {
+                                WalletSetupChoice.ImportPublicKey ->
+                                    navController.navigate(AppDestination.ScanQRCode) {
+                                        launchSingleTop = true
+                                    }
+
+                                WalletSetupChoice.CreateWallet ->
+                                    navController.navigate(AppDestination.Charge) {
+                                        popUpTo(AppDestination.Welcome) { inclusive = true }
+                                        launchSingleTop = true
+                                    }
                             }
                         },
                     )
@@ -207,6 +239,17 @@ fun AppNavGraph(navController: NavHostController) {
 
                 composable<AppDestination.WalletSeedPhrase> {
                     WalletSeedPhraseScreen(viewModel = walletViewModel)
+                }
+
+                composable<AppDestination.ScanQRCode> {
+                    ScanQRCodeScreen(
+                        onResult = { value ->
+                            navController.previousBackStackEntry
+                                ?.savedStateHandle
+                                ?.set(AppDestination.SCAN_RESULT_KEY, value)
+                            navController.popBackStack()
+                        },
+                    )
                 }
             }
         }

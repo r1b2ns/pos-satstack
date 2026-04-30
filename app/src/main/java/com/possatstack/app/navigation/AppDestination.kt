@@ -40,4 +40,16 @@ sealed interface AppDestination {
 
     @Serializable
     data object WalletTransactions : AppDestination
+
+    /**
+     * Generic QR-scanner module. The caller listens for a result on its own
+     * back-stack entry under [SCAN_RESULT_KEY] (set via savedStateHandle by
+     * the scan composable in NavGraph before popping).
+     */
+    @Serializable
+    data object ScanQRCode : AppDestination
+
+    companion object {
+        const val SCAN_RESULT_KEY: String = "scan_qr_result"
+    }
 }
