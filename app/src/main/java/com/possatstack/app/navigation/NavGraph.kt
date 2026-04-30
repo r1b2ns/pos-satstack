@@ -1,5 +1,6 @@
 package com.possatstack.app.navigation
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -7,6 +8,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -37,6 +39,7 @@ import com.possatstack.app.ui.onboarding.WalletSetupChoice
 import com.possatstack.app.ui.onboarding.WelcomeCarouselScreen
 import com.possatstack.app.ui.scanqrcode.ScanQRCodeScreen
 import com.possatstack.app.ui.settings.SettingsScreen
+import com.possatstack.app.ui.theme.BitcoinOrange
 import com.possatstack.app.ui.wallet.WalletScreen
 import com.possatstack.app.ui.wallet.WalletViewModel
 import com.possatstack.app.ui.wallet.import.WalletImportScreen
@@ -52,6 +55,25 @@ fun AppNavGraph(navController: NavHostController) {
     // allows the sync progress toast to be shown from any destination.
     val walletViewModel: WalletViewModel = hiltViewModel()
     val walletState by walletViewModel.state.collectAsStateWithLifecycle()
+
+    // Wait for the wallet engine to report its current state before deciding
+    // the start destination — otherwise the UI would briefly route through
+    // onboarding even when a wallet is already configured.
+    if (!walletState.isInitialized) {
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .background(Color.White),
+            contentAlignment = Alignment.Center,
+        ) {
+            CircularProgressIndicator(color = BitcoinOrange)
+        }
+        return
+    }
+
+    val rootDestination: AppDestination =
+        if (walletState.hasWallet) AppDestination.Charge else AppDestination.Welcome
 
     // Recompose on every navigation event so the top bar reacts immediately.
     val currentBackStackEntry by navController.currentBackStackEntryAsState()
@@ -128,7 +150,7 @@ fun AppNavGraph(navController: NavHostController) {
         ) { innerPadding ->
             NavHost(
                 navController = navController,
-                startDestination = AppDestination.Welcome,
+                startDestination = rootDestination,
                 modifier = Modifier.padding(innerPadding),
             ) {
                 composable<AppDestination.Welcome> {
