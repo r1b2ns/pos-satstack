@@ -139,6 +139,12 @@
     <string name="onboarding_option_create_wallet_title">Create a wallet</string>
     <string name="onboarding_option_create_wallet_subtitle">Less secure — this device will be able to move your funds.</string>
 
+    <!-- Wallet backup -->
+    <string name="wallet_backup_tab_seeds">Seeds</string>
+    <string name="wallet_backup_tab_qr">QR Code</string>
+    <string name="wallet_backup_qr_caption">Scan with another wallet to import the same seed.</string>
+    <string name="wallet_backup_confirm">I have backed up my seeds</string>
+
     <!-- Scan QR code -->
     <string name="scan_qr_title">Scan QR code</string>
     <string name="scan_qr_no_camera_title">Camera not available</string>

@@ -18,7 +18,9 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -185,7 +187,21 @@ fun AppNavGraph(navController: NavHostController) {
                             }
                     }
 
+                    // Track whether the user just kicked off wallet creation
+                    // so we navigate to the backup screen as soon as the
+                    // engine reports the wallet is ready.
+                    var creatingWallet by remember { mutableStateOf(false) }
+                    LaunchedEffect(walletState.hasWallet, creatingWallet) {
+                        if (creatingWallet && walletState.hasWallet) {
+                            creatingWallet = false
+                            navController.navigate(AppDestination.WalletBackup) {
+                                launchSingleTop = true
+                            }
+                        }
+                    }
+
                     OnboardingSetupScreen(
+                        isLoading = creatingWallet,
                         onContinue = { choice ->
                             when (choice) {
                                 WalletSetupChoice.ImportPublicKey ->
@@ -193,11 +209,22 @@ fun AppNavGraph(navController: NavHostController) {
                                         launchSingleTop = true
                                     }
 
-                                WalletSetupChoice.CreateWallet ->
-                                    navController.navigate(AppDestination.Charge) {
-                                        popUpTo(AppDestination.Welcome) { inclusive = true }
-                                        launchSingleTop = true
-                                    }
+                                WalletSetupChoice.CreateWallet -> {
+                                    creatingWallet = true
+                                    walletViewModel.createWallet()
+                                }
+                            }
+                        },
+                    )
+                }
+
+                composable<AppDestination.WalletBackup> {
+                    WalletSeedPhraseScreen(
+                        viewModel = walletViewModel,
+                        onContinue = {
+                            navController.navigate(AppDestination.Charge) {
+                                popUpTo(AppDestination.Welcome) { inclusive = true }
+                                launchSingleTop = true
                             }
                         },
                     )

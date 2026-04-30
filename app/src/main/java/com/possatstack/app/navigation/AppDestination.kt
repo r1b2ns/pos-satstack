@@ -38,6 +38,14 @@ sealed interface AppDestination {
     @Serializable
     data object WalletSeedPhrase : AppDestination
 
+    /**
+     * Onboarding-only seed-phrase backup screen. Same UI as
+     * [WalletSeedPhrase] but with the "I have backed up my seeds" checkbox
+     * and a Continue button — gating advancement to the charge screen.
+     */
+    @Serializable
+    data object WalletBackup : AppDestination
+
     @Serializable
     data object WalletTransactions : AppDestination
 

@@ -28,7 +28,10 @@ import com.possatstack.app.ui.components.RadioOptionGroup
 enum class WalletSetupChoice { ImportPublicKey, CreateWallet }
 
 @Composable
-fun OnboardingSetupScreen(onContinue: (WalletSetupChoice) -> Unit) {
+fun OnboardingSetupScreen(
+    onContinue: (WalletSetupChoice) -> Unit,
+    isLoading: Boolean = false,
+) {
     var choice by remember { mutableStateOf<WalletSetupChoice?>(null) }
 
     val options =
@@ -83,6 +86,7 @@ fun OnboardingSetupScreen(onContinue: (WalletSetupChoice) -> Unit) {
             label = stringResource(R.string.welcome_continue),
             onClick = { choice?.let(onContinue) },
             enabled = choice != null,
+            isLoading = isLoading,
         )
     }
 }
