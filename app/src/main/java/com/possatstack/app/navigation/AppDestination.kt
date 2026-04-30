@@ -6,6 +6,12 @@ sealed interface AppDestination {
     // ── Root ─────────────────────────────────────────────────────────────────
 
     @Serializable
+    data object Welcome : AppDestination
+
+    @Serializable
+    data object OnboardingSetup : AppDestination
+
+    @Serializable
     data object Charge : AppDestination
 
     /** Details screen for an active charge: QR + payment-status tracking. */

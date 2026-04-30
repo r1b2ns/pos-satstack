@@ -119,6 +119,26 @@
     <string name="signer_kind_coldcard">Coldcard (airgap)</string>
     <string name="signer_kind_qr">Airgap QR</string>
 
+    <!-- Welcome carousel -->
+    <string name="welcome_step1_title">Get paid in bitcoin</string>
+    <string name="welcome_step1_description">Receive your sales easily and privately — just like physical cash, only better.</string>
+    <string name="welcome_step2_title">No app fees</string>
+    <string name="welcome_step2_description">Your customer only pays the network fee.</string>
+    <string name="welcome_step3_title">No identification</string>
+    <string name="welcome_step3_description">Full privacy: no name, no address, no location, no KYC.</string>
+    <string name="welcome_step4_title">Always available</string>
+    <string name="welcome_step4_description">Bitcoin runs 24 hours a day, 7 days a week, anywhere in the world.</string>
+    <string name="welcome_continue">Continue</string>
+
+    <!-- Onboarding setup -->
+    <string name="onboarding_setup_title">Let\'s set up how you get paid</string>
+    <string name="onboarding_setup_description">Here you\'ll configure your wallet. Every sale you make will be received in this wallet.</string>
+    <string name="onboarding_option_import_pubkey_title">Import public key</string>
+    <string name="onboarding_option_import_pubkey_subtitle">The most secure way to set up your PoS.</string>
+    <string name="onboarding_option_import_pubkey_info">Set up your wallet on another device and import only the public key here.</string>
+    <string name="onboarding_option_create_wallet_title">Create a wallet</string>
+    <string name="onboarding_option_create_wallet_subtitle">Less secure — this device will be able to move your funds.</string>
+
     <!-- TAPSIGNER dialog -->
     <string name="tapsigner_title">Sign with TAPSIGNER</string>
     <string name="tapsigner_cvc_label">Card code (CVC)</string>

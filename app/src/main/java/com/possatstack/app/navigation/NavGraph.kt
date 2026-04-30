@@ -31,6 +31,8 @@ import com.possatstack.app.R
 import com.possatstack.app.ui.charge.ChargeDetailsScreen
 import com.possatstack.app.ui.charge.ChargeScreen
 import com.possatstack.app.ui.components.SyncProgressToast
+import com.possatstack.app.ui.onboarding.OnboardingSetupScreen
+import com.possatstack.app.ui.onboarding.WelcomeCarouselScreen
 import com.possatstack.app.ui.settings.SettingsScreen
 import com.possatstack.app.ui.wallet.WalletScreen
 import com.possatstack.app.ui.wallet.WalletViewModel
@@ -64,12 +66,24 @@ fun AppNavGraph(navController: NavHostController) {
             currentBackStackEntry?.destination?.route?.contains("Charge") == true
         }
 
+    val isOnboardingRoute =
+        remember(currentBackStackEntry) {
+            val route = currentBackStackEntry?.destination?.route.orEmpty()
+            route.contains("Welcome") || route.contains("OnboardingSetup")
+        }
+
+    val isSettingsRoute =
+        remember(currentBackStackEntry) {
+            currentBackStackEntry?.destination?.route?.contains("Settings") == true
+        }
+
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
             topBar = {
-                CenterAlignedTopAppBar(
+                if (!isOnboardingRoute) {
+                    CenterAlignedTopAppBar(
                     title = {
-                        if (!isChargeRoute) {
+                        if (isSettingsRoute) {
                             Text(stringResource(R.string.settings))
                         }
                     },
@@ -105,14 +119,36 @@ fun AppNavGraph(navController: NavHostController) {
                         } else {
                             TopAppBarDefaults.centerAlignedTopAppBarColors()
                         },
-                )
+                    )
+                }
             },
         ) { innerPadding ->
             NavHost(
                 navController = navController,
-                startDestination = AppDestination.Charge,
+                startDestination = AppDestination.Welcome,
                 modifier = Modifier.padding(innerPadding),
             ) {
+                composable<AppDestination.Welcome> {
+                    WelcomeCarouselScreen(
+                        onContinue = {
+                            navController.navigate(AppDestination.OnboardingSetup) {
+                                launchSingleTop = true
+                            }
+                        },
+                    )
+                }
+
+                composable<AppDestination.OnboardingSetup> {
+                    OnboardingSetupScreen(
+                        onContinue = {
+                            navController.navigate(AppDestination.Charge) {
+                                popUpTo(AppDestination.Welcome) { inclusive = true }
+                                launchSingleTop = true
+                            }
+                        },
+                    )
+                }
+
                 composable<AppDestination.Charge> {
                     ChargeScreen(
                         onChargeCreated = { chargeId ->
