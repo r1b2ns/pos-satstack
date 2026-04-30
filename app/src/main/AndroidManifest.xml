@@ -6,6 +6,7 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.NFC" />
+    <uses-permission android:name="android.permission.CAMERA" />
 
     <!--
         NFC is optional: POS devices without NFC hardware still install the app;
@@ -13,6 +14,17 @@
     -->
     <uses-feature
         android:name="android.hardware.nfc"
+        android:required="false" />
+
+    <!--
+        Camera is optional: handsets without a camera still install; the
+        ScanQRCode module shows an empty state on those devices.
+    -->
+    <uses-feature
+        android:name="android.hardware.camera"
+        android:required="false" />
+    <uses-feature
+        android:name="android.hardware.camera.autofocus"
         android:required="false" />
 
     <application

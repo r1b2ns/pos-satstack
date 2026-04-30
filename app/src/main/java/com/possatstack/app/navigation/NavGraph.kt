@@ -1,5 +1,6 @@
 package com.possatstack.app.navigation
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -7,6 +8,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -14,8 +16,11 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -31,7 +36,12 @@ import com.possatstack.app.R
 import com.possatstack.app.ui.charge.ChargeDetailsScreen
 import com.possatstack.app.ui.charge.ChargeScreen
 import com.possatstack.app.ui.components.SyncProgressToast
+import com.possatstack.app.ui.onboarding.OnboardingSetupScreen
+import com.possatstack.app.ui.onboarding.WalletSetupChoice
+import com.possatstack.app.ui.onboarding.WelcomeCarouselScreen
+import com.possatstack.app.ui.scanqrcode.ScanQRCodeScreen
 import com.possatstack.app.ui.settings.SettingsScreen
+import com.possatstack.app.ui.theme.BitcoinOrange
 import com.possatstack.app.ui.wallet.WalletScreen
 import com.possatstack.app.ui.wallet.WalletViewModel
 import com.possatstack.app.ui.wallet.import.WalletImportScreen
@@ -47,6 +57,25 @@ fun AppNavGraph(navController: NavHostController) {
     // allows the sync progress toast to be shown from any destination.
     val walletViewModel: WalletViewModel = hiltViewModel()
     val walletState by walletViewModel.state.collectAsStateWithLifecycle()
+
+    // Wait for the wallet engine to report its current state before deciding
+    // the start destination — otherwise the UI would briefly route through
+    // onboarding even when a wallet is already configured.
+    if (!walletState.isInitialized) {
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .background(Color.White),
+            contentAlignment = Alignment.Center,
+        ) {
+            CircularProgressIndicator(color = BitcoinOrange)
+        }
+        return
+    }
+
+    val rootDestination: AppDestination =
+        if (walletState.hasWallet) AppDestination.Charge else AppDestination.Welcome
 
     // Recompose on every navigation event so the top bar reacts immediately.
     val currentBackStackEntry by navController.currentBackStackEntryAsState()
@@ -64,12 +93,24 @@ fun AppNavGraph(navController: NavHostController) {
             currentBackStackEntry?.destination?.route?.contains("Charge") == true
         }
 
+    val isOnboardingRoute =
+        remember(currentBackStackEntry) {
+            val route = currentBackStackEntry?.destination?.route.orEmpty()
+            route.contains("Welcome") || route.contains("OnboardingSetup")
+        }
+
+    val isSettingsRoute =
+        remember(currentBackStackEntry) {
+            currentBackStackEntry?.destination?.route?.contains("Settings") == true
+        }
+
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
             topBar = {
-                CenterAlignedTopAppBar(
+                if (!isOnboardingRoute) {
+                    CenterAlignedTopAppBar(
                     title = {
-                        if (!isChargeRoute) {
+                        if (isSettingsRoute) {
                             Text(stringResource(R.string.settings))
                         }
                     },
@@ -105,14 +146,90 @@ fun AppNavGraph(navController: NavHostController) {
                         } else {
                             TopAppBarDefaults.centerAlignedTopAppBarColors()
                         },
-                )
+                    )
+                }
             },
         ) { innerPadding ->
             NavHost(
                 navController = navController,
-                startDestination = AppDestination.Charge,
+                startDestination = rootDestination,
                 modifier = Modifier.padding(innerPadding),
             ) {
+                composable<AppDestination.Welcome> {
+                    WelcomeCarouselScreen(
+                        onContinue = {
+                            navController.navigate(AppDestination.OnboardingSetup) {
+                                launchSingleTop = true
+                            }
+                        },
+                    )
+                }
+
+                composable<AppDestination.OnboardingSetup> { backStackEntry ->
+                    // Listen for the result returned by the QR-scan module.
+                    // Once consumed we clear the key so re-entering the screen
+                    // (e.g. user backs out and tries again) starts clean.
+                    LaunchedEffect(backStackEntry) {
+                        backStackEntry.savedStateHandle
+                            .getStateFlow<String?>(AppDestination.SCAN_RESULT_KEY, null)
+                            .collect { scanned ->
+                                if (scanned != null) {
+                                    backStackEntry.savedStateHandle
+                                        .remove<String>(AppDestination.SCAN_RESULT_KEY)
+                                    // TODO: persist the imported xpub via WalletViewModel
+                                    // before completing onboarding. For now we just
+                                    // advance to the charge screen.
+                                    navController.navigate(AppDestination.Charge) {
+                                        popUpTo(AppDestination.Welcome) { inclusive = true }
+                                        launchSingleTop = true
+                                    }
+                                }
+                            }
+                    }
+
+                    // Track whether the user just kicked off wallet creation
+                    // so we navigate to the backup screen as soon as the
+                    // engine reports the wallet is ready.
+                    var creatingWallet by remember { mutableStateOf(false) }
+                    LaunchedEffect(walletState.hasWallet, creatingWallet) {
+                        if (creatingWallet && walletState.hasWallet) {
+                            creatingWallet = false
+                            navController.navigate(AppDestination.WalletBackup) {
+                                launchSingleTop = true
+                            }
+                        }
+                    }
+
+                    OnboardingSetupScreen(
+                        isLoading = creatingWallet,
+                        onContinue = { choice ->
+                            when (choice) {
+                                WalletSetupChoice.ImportPublicKey ->
+                                    navController.navigate(AppDestination.ScanQRCode) {
+                                        launchSingleTop = true
+                                    }
+
+                                WalletSetupChoice.CreateWallet -> {
+                                    creatingWallet = true
+                                    walletViewModel.createWallet()
+                                }
+                            }
+                        },
+                    )
+                }
+
+                composable<AppDestination.WalletBackup> {
+                    WalletSeedPhraseScreen(
+                        viewModel = walletViewModel,
+                        onContinue = {
+                            navController.navigate(AppDestination.Charge) {
+                                popUpTo(AppDestination.Welcome) { inclusive = true }
+                                launchSingleTop = true
+                            }
+                        },
+                    )
+                }
+
                 composable<AppDestination.Charge> {
                     ChargeScreen(
                         onChargeCreated = { chargeId ->
@@ -171,6 +288,17 @@ fun AppNavGraph(navController: NavHostController) {
 
                 composable<AppDestination.WalletSeedPhrase> {
                     WalletSeedPhraseScreen(viewModel = walletViewModel)
+                }
+
+                composable<AppDestination.ScanQRCode> {
+                    ScanQRCodeScreen(
+                        onResult = { value ->
+                            navController.previousBackStackEntry
+                                ?.savedStateHandle
+                                ?.set(AppDestination.SCAN_RESULT_KEY, value)
+                            navController.popBackStack()
+                        },
+                    )
                 }
             }
         }

@@ -26,6 +26,14 @@ class WalletViewModel
     ) : ViewModel() {
         data class State(
             val isLoading: Boolean = false,
+            /**
+             * Flips to `true` once [initWallet] has finished probing the
+             * engine, regardless of whether a wallet was found. Consumers
+             * (notably the navigation start-destination decision) wait for
+             * this to flip before reading [hasWallet] so they don't briefly
+             * route the user through onboarding while the engine loads.
+             */
+            val isInitialized: Boolean = false,
             val hasWallet: Boolean = false,
             val receiveAddress: String? = null,
             val errorMessage: String? = null,
@@ -47,7 +55,7 @@ class WalletViewModel
         private fun initWallet() {
             viewModelScope.launch {
                 if (!engine.hasWallet()) {
-                    _state.update { it.copy(hasWallet = false) }
+                    _state.update { it.copy(isInitialized = true, hasWallet = false) }
                     return@launch
                 }
                 _state.update { it.copy(isLoading = true) }
@@ -55,12 +63,23 @@ class WalletViewModel
                     .onSuccess {
                         val network = runCatching { engine.getNetwork() }.getOrNull()
                         _state.update {
-                            it.copy(isLoading = false, hasWallet = true, network = network)
+                            it.copy(
+                                isLoading = false,
+                                isInitialized = true,
+                                hasWallet = true,
+                                network = network,
+                            )
                         }
                         syncWallet()
                     }
                     .onFailure { exception ->
-                        _state.update { it.copy(isLoading = false, errorMessage = exception.message) }
+                        _state.update {
+                            it.copy(
+                                isLoading = false,
+                                isInitialized = true,
+                                errorMessage = exception.message,
+                            )
+                        }
                     }
             }
         }
@@ -85,7 +104,7 @@ class WalletViewModel
         fun deleteWallet() {
             viewModelScope.launch {
                 runCatching { engine.deleteWallet() }
-                _state.value = State(hasWallet = false)
+                _state.value = State(isInitialized = true, hasWallet = false)
             }
         }
 
