@@ -49,6 +49,7 @@ import com.possatstack.app.ui.wallet.import.WalletImportScreen
 import com.possatstack.app.ui.wallet.receive.WalletReceiveScreen
 import com.possatstack.app.ui.wallet.seedphrase.WalletSeedPhraseScreen
 import com.possatstack.app.ui.wallet.send.WalletSendScreen
+import com.possatstack.app.ui.wallet.setup.TapsignerImportScreen
 import com.possatstack.app.ui.wallet.transactions.WalletTransactionsScreen
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -216,7 +217,7 @@ fun AppNavGraph(navController: NavHostController) {
                         onContinue = { choice ->
                             when (choice) {
                                 WalletSetupChoice.ImportPublicKey ->
-                                    navController.navigate(AppDestination.ScanQRCode) {
+                                    navController.navigate(AppDestination.TapsignerImport) {
                                         launchSingleTop = true
                                     }
 
@@ -238,6 +239,19 @@ fun AppNavGraph(navController: NavHostController) {
                                 launchSingleTop = true
                             }
                         },
+                    )
+                }
+
+                composable<AppDestination.TapsignerImport> {
+                    TapsignerImportScreen(
+                        walletViewModel = walletViewModel,
+                        onImported = {
+                            navController.navigate(AppDestination.Charge) {
+                                popUpTo(AppDestination.Welcome) { inclusive = true }
+                                launchSingleTop = true
+                            }
+                        },
+                        onCancel = { navController.popBackStack() },
                     )
                 }
 

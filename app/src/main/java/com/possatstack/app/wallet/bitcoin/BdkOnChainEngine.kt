@@ -33,6 +33,7 @@ import org.bitcoindevkit.Amount
 import org.bitcoindevkit.BumpFeeTxBuilder
 import org.bitcoindevkit.ChainPosition
 import org.bitcoindevkit.Descriptor
+import org.bitcoindevkit.DescriptorPublicKey
 import org.bitcoindevkit.DescriptorSecretKey
 import org.bitcoindevkit.FeeRate
 import org.bitcoindevkit.KeychainKind
@@ -205,59 +206,117 @@ class BdkOnChainEngine
                         "Importing wallet (kind=${backup::class.simpleName}, network=${backup.network})",
                     )
                     migrateLegacyDbPath()
-                    val bip39 =
-                        backup as? WalletBackup.Bip39
-                            ?: throw WalletError.Unknown(
+                    when (backup) {
+                        is WalletBackup.Bip39 -> importBip39(backup)
+                        is WalletBackup.XpubWatching -> importXpubWatching(backup)
+                        else ->
+                            throw WalletError.Unknown(
                                 IllegalArgumentException("Backup kind ${backup::class.simpleName} not supported yet"),
                             )
-
-                    resetDatabaseAndState()
-
-                    try {
-                        val bdkNetwork = bip39.network.toBdkNetwork()
-                        val mnemonicString = String(bip39.mnemonic)
-                        val parsedMnemonic =
-                            try {
-                                Mnemonic.fromString(mnemonicString)
-                            } finally {
-                                // We built a String which lingers in the String pool; we
-                                // cannot wipe it. Caller is responsible for zeroing the
-                                // original CharArray they passed in.
-                                @Suppress("UNUSED_EXPRESSION")
-                                mnemonicString
-                            }
-                        val rootKey = DescriptorSecretKey(bdkNetwork, parsedMnemonic, null)
-
-                        val externalDescriptor = Descriptor.newBip84(rootKey, KeychainKind.EXTERNAL, bdkNetwork)
-                        val internalDescriptor = Descriptor.newBip84(rootKey, KeychainKind.INTERNAL, bdkNetwork)
-
-                        val descriptorRecord =
-                            WalletDescriptor(
-                                externalDescriptor = externalDescriptor.toStringWithSecret(),
-                                internalDescriptor = internalDescriptor.toStringWithSecret(),
-                                network = bip39.network,
-                            )
-
-                        signerStore.saveMnemonic(bip39.mnemonic, bip39.network)
-                        walletStorage.save(descriptorRecord)
-                        walletStorage.markChainBackend(BuildConfig.CHAIN_BACKEND)
-
-                        val persisterInstance = Persister.newSqlite(dbPath)
-                        wallet =
-                            Wallet(
-                                descriptor = Descriptor(descriptorRecord.externalDescriptor, bdkNetwork),
-                                changeDescriptor = Descriptor(descriptorRecord.internalDescriptor, bdkNetwork),
-                                network = bdkNetwork,
-                                persister = persisterInstance,
-                            )
-                        persister = persisterInstance
-                        chainDataSource.configureFor(bip39.network)
-                        AppLogger.info(TAG, "Wallet imported")
-                    } catch (exception: Exception) {
-                        throw exception.toWalletError()
                     }
                 }
             }
+
+        private suspend fun importBip39(bip39: WalletBackup.Bip39) {
+            resetDatabaseAndState()
+            try {
+                val bdkNetwork = bip39.network.toBdkNetwork()
+                val mnemonicString = String(bip39.mnemonic)
+                val parsedMnemonic =
+                    try {
+                        Mnemonic.fromString(mnemonicString)
+                    } finally {
+                        // We built a String which lingers in the String pool; we
+                        // cannot wipe it. Caller is responsible for zeroing the
+                        // original CharArray they passed in.
+                        @Suppress("UNUSED_EXPRESSION")
+                        mnemonicString
+                    }
+                val rootKey = DescriptorSecretKey(bdkNetwork, parsedMnemonic, null)
+
+                val externalDescriptor = Descriptor.newBip84(rootKey, KeychainKind.EXTERNAL, bdkNetwork)
+                val internalDescriptor = Descriptor.newBip84(rootKey, KeychainKind.INTERNAL, bdkNetwork)
+
+                val descriptorRecord =
+                    WalletDescriptor(
+                        externalDescriptor = externalDescriptor.toStringWithSecret(),
+                        internalDescriptor = internalDescriptor.toStringWithSecret(),
+                        network = bip39.network,
+                    )
+
+                signerStore.saveMnemonic(bip39.mnemonic, bip39.network)
+                walletStorage.save(descriptorRecord)
+                walletStorage.markChainBackend(BuildConfig.CHAIN_BACKEND)
+
+                val persisterInstance = Persister.newSqlite(dbPath)
+                wallet =
+                    Wallet(
+                        descriptor = Descriptor(descriptorRecord.externalDescriptor, bdkNetwork),
+                        changeDescriptor = Descriptor(descriptorRecord.internalDescriptor, bdkNetwork),
+                        network = bdkNetwork,
+                        persister = persisterInstance,
+                    )
+                persister = persisterInstance
+                chainDataSource.configureFor(bip39.network)
+                AppLogger.info(TAG, "Wallet imported (bip39)")
+            } catch (exception: Exception) {
+                throw exception.toWalletError()
+            }
+        }
+
+        /**
+         * Watch-only import driven by a hardware signer (TAPSIGNER today).
+         * The caller supplies the **account-level** xpub (`m/84'/coin'/0'`)
+         * and the master fingerprint; BDK fills the BIP-84 origin metadata
+         * so future PSBT signers can match input derivations against this
+         * exact card. No mnemonic is stored.
+         */
+        private suspend fun importXpubWatching(watching: WalletBackup.XpubWatching) {
+            resetDatabaseAndState()
+            try {
+                val bdkNetwork = watching.network.toBdkNetwork()
+                val accountKey = DescriptorPublicKey.fromString(watching.xpub)
+
+                val externalDescriptor =
+                    Descriptor.newBip84Public(
+                        publicKey = accountKey,
+                        fingerprint = watching.fingerprint,
+                        keychainKind = KeychainKind.EXTERNAL,
+                        network = bdkNetwork,
+                    )
+                val internalDescriptor =
+                    Descriptor.newBip84Public(
+                        publicKey = accountKey,
+                        fingerprint = watching.fingerprint,
+                        keychainKind = KeychainKind.INTERNAL,
+                        network = bdkNetwork,
+                    )
+
+                val descriptorRecord =
+                    WalletDescriptor(
+                        externalDescriptor = externalDescriptor.toString(),
+                        internalDescriptor = internalDescriptor.toString(),
+                        network = watching.network,
+                    )
+
+                walletStorage.save(descriptorRecord)
+                walletStorage.markChainBackend(BuildConfig.CHAIN_BACKEND)
+
+                val persisterInstance = Persister.newSqlite(dbPath)
+                wallet =
+                    Wallet(
+                        descriptor = Descriptor(descriptorRecord.externalDescriptor, bdkNetwork),
+                        changeDescriptor = Descriptor(descriptorRecord.internalDescriptor, bdkNetwork),
+                        network = bdkNetwork,
+                        persister = persisterInstance,
+                    )
+                persister = persisterInstance
+                chainDataSource.configureFor(watching.network)
+                AppLogger.info(TAG, "Wallet imported (watch-only xpub)")
+            } catch (exception: Exception) {
+                throw exception.toWalletError()
+            }
+        }
 
         override suspend fun deleteWallet(): Unit =
             withContext(Dispatchers.IO) {

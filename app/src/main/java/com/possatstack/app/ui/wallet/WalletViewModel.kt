@@ -129,6 +129,36 @@ class WalletViewModel
             }
         }
 
+        /**
+         * Import a watch-only wallet from a hardware signer (TAPSIGNER today).
+         * No mnemonic is persisted — the on-card secret stays on the card,
+         * and signing happens via the matching
+         * [com.possatstack.app.wallet.signer.Signer] at PSBT-build time.
+         */
+        suspend fun importWalletWatching(
+            xpub: String,
+            fingerprint: String,
+        ) {
+            _state.update { it.copy(isLoading = true, errorMessage = null) }
+            try {
+                engine.importWallet(
+                    WalletBackup.XpubWatching(
+                        xpub = xpub,
+                        fingerprint = fingerprint,
+                        network = WalletNetwork.SIGNET,
+                    ),
+                )
+                val network = runCatching { engine.getNetwork() }.getOrNull()
+                _state.update {
+                    it.copy(isLoading = false, hasWallet = true, network = network)
+                }
+                syncWallet()
+            } catch (exception: Exception) {
+                _state.update { it.copy(isLoading = false, errorMessage = exception.message) }
+                throw exception
+            }
+        }
+
         fun loadReceiveAddress() {
             viewModelScope.launch {
                 _state.update { it.copy(isLoading = true, receiveAddress = null) }

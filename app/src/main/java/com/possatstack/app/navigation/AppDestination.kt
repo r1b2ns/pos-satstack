@@ -49,6 +49,10 @@ sealed interface AppDestination {
     @Serializable
     data object WalletTransactions : AppDestination
 
+    /** Onboarding step that imports a watch-only wallet from a TAPSIGNER tap. */
+    @Serializable
+    data object TapsignerImport : AppDestination
+
     /**
      * Generic QR-scanner module. The caller listens for a result on its own
      * back-stack entry under [SCAN_RESULT_KEY] (set via savedStateHandle by

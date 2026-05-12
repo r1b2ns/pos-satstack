@@ -175,4 +175,11 @@
     <string name="tapsigner_error_not_tapsigner">This tag is not a TAPSIGNER card.</string>
     <string name="tapsigner_error_timeout">No card detected — try again.</string>
     <string name="tapsigner_retry">Try again</string>
+    <string name="tapsigner_error_not_set_up">This TAPSIGNER has not been set up yet.</string>
+
+    <!-- TAPSIGNER xpub import (onboarding) -->
+    <string name="tapsigner_import_title">Import from TAPSIGNER</string>
+    <string name="tapsigner_import_subtitle">Use your TAPSIGNER card to set up a watch-only wallet on this device. Signing will happen on the card when you send payments.</string>
+    <string name="tapsigner_cvc_prompt">Enter the CVC printed on the back of your TAPSIGNER.</string>
+    <string name="tapsigner_import_persisting">Saving the wallet…</string>
 </resources>
