@@ -20,7 +20,7 @@
     <string name="charge_status_detected">Payment detected — awaiting confirmation</string>
     <string name="charge_view_on_mempool">View on mempool</string>
     <string name="charge_view_address_on_mempool">View address on mempool</string>
-    <string name="charge_status_detected_hint">Wait least 1 confirmation</string>
+    <string name="charge_status_detected_hint">Wait for at least 1 confirmation</string>
     <string name="charge_status_cancelled_hint">Payment has been canceled</string>
     <string name="charge_status_confirmed">Payment confirmed</string>
     <string name="charge_status_cancelled">Charge cancelled</string>
