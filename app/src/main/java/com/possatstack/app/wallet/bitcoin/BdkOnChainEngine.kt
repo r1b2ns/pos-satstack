@@ -394,6 +394,7 @@ class BdkOnChainEngine
             withContext(Dispatchers.IO) {
                 mutex.withLock {
                     val activeWallet = requireLoaded()
+                    val bdkNetwork = walletStorage.load()?.network?.toBdkNetwork()
                     try {
                         activeWallet.transactions().map { canonicalTx ->
                             val transaction = canonicalTx.transaction
@@ -406,6 +407,20 @@ class BdkOnChainEngine
                             val blockHeight =
                                 (chainPosition as? ChainPosition.Confirmed)
                                     ?.confirmationBlockTime?.blockId?.height?.toLong()
+                            val isIncoming = amounts.received.toSat().toLong() >= amounts.sent.toSat().toLong()
+                            val address =
+                                bdkNetwork?.let { network ->
+                                    transaction.output().firstNotNullOfOrNull { txOut ->
+                                        val mine = activeWallet.isMine(txOut.scriptPubkey)
+                                        if (mine == isIncoming) {
+                                            runCatching {
+                                                Address.fromScript(txOut.scriptPubkey, network).toString()
+                                            }.getOrNull()
+                                        } else {
+                                            null
+                                        }
+                                    }
+                                }
                             WalletTransaction(
                                 txid = transaction.computeTxid().toString(),
                                 sentSats = amounts.sent.toSat().toLong(),
@@ -414,6 +429,7 @@ class BdkOnChainEngine
                                 confirmationTime = confirmationTime,
                                 blockHeight = blockHeight,
                                 isConfirmed = isConfirmed,
+                                address = address,
                             )
                         }.sortedWith(
                             compareBy<WalletTransaction> { it.isConfirmed }

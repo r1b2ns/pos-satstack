@@ -12,6 +12,12 @@ data class WalletTransaction(
     val confirmationTime: Long?,
     val blockHeight: Long?,
     val isConfirmed: Boolean,
+    /**
+     * For incoming transactions: a wallet-owned output address.
+     * For outgoing transactions: an external recipient address.
+     * `null` when the address cannot be decoded (e.g. non-standard script).
+     */
+    val address: String? = null,
 ) {
     /** Net effect on the wallet balance in satoshis (positive = incoming). */
     val netSats: Long get() = receivedSats - sentSats
