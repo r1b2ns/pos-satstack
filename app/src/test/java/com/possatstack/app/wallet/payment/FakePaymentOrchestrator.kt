@@ -16,8 +16,10 @@ class FakePaymentOrchestrator : PaymentOrchestrator {
     var availableMethodsCount = 0
     var createCount = 0
     var cancelCount = 0
+    var refreshCount = 0
     val createRequests = mutableListOf<Triple<PaymentMethod, Long, String?>>()
     val cancelledIds = mutableListOf<String>()
+    val refreshedIds = mutableListOf<String>()
 
     override suspend fun availableMethods(): List<PaymentMethod> {
         availableMethodsCount++
@@ -58,6 +60,11 @@ class FakePaymentOrchestrator : PaymentOrchestrator {
         cancelCount++
         cancelledIds += chargeId
         statuses[chargeId]?.value = ChargeStatus.Cancelled
+    }
+
+    override suspend fun refreshCharge(chargeId: String) {
+        refreshCount++
+        refreshedIds += chargeId
     }
 
     override fun getCharge(chargeId: String): Charge? = charges[chargeId]

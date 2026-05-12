@@ -89,6 +89,13 @@ class DefaultPaymentOrchestrator internal constructor(
         AppLogger.info(TAG, "Charge $chargeId cancelled")
     }
 
+    override suspend fun refreshCharge(chargeId: String) {
+        val charge = charges[chargeId] ?: return
+        val flow = statuses[chargeId] ?: return
+        val baseline = baselines[chargeId] ?: return
+        checkOnChainCharge(charge, flow, baseline)
+    }
+
     // ─────────────────────────────────────────────────────────────────────
 
     private suspend fun createOnChainCharge(
@@ -138,36 +145,51 @@ class DefaultPaymentOrchestrator internal constructor(
         val baseline = baselines[chargeId] ?: return
 
         while (true) {
-            runCatching { engine.sync() }.onFailure { exception ->
-                AppLogger.info(TAG, "sync during charge monitor failed: ${exception.message}")
+            val confirmed = checkOnChainCharge(charge, flow, baseline)
+            if (confirmed) {
+                monitors.remove(chargeId)
+                return
             }
-
-            val transactions =
-                runCatching { engine.getTransactions() }
-                    .getOrNull().orEmpty()
-            val incoming =
-                transactions
-                    .filter { it.txid !in baseline && it.receivedSats >= charge.amountSats }
-                    .maxByOrNull { it.receivedSats }
-
-            when {
-                incoming == null -> Unit
-                incoming.isConfirmed -> {
-                    flow.value =
-                        ChargeStatus.Confirmed(
-                            txid = Txid(incoming.txid),
-                            blockHeight = incoming.blockHeight,
-                        )
-                    AppLogger.info(TAG, "Charge $chargeId confirmed at block ${incoming.blockHeight}")
-                    monitors.remove(chargeId)
-                    return
-                }
-                else -> {
-                    flow.value = ChargeStatus.Detected(Txid(incoming.txid))
-                }
-            }
-
             delay(pollIntervalMs)
+        }
+    }
+
+    /**
+     * Runs one sync+check cycle. Returns `true` when the charge has been
+     * confirmed (so callers can stop polling).
+     */
+    private suspend fun checkOnChainCharge(
+        charge: Charge,
+        flow: MutableStateFlow<ChargeStatus>,
+        baseline: Set<String>,
+    ): Boolean {
+        runCatching { engine.sync() }.onFailure { exception ->
+            AppLogger.info(TAG, "sync during charge check failed: ${exception.message}")
+        }
+
+        val transactions =
+            runCatching { engine.getTransactions() }
+                .getOrNull().orEmpty()
+        val incoming =
+            transactions
+                .filter { it.txid !in baseline && it.receivedSats >= charge.amountSats }
+                .maxByOrNull { it.receivedSats }
+
+        return when {
+            incoming == null -> false
+            incoming.isConfirmed -> {
+                flow.value =
+                    ChargeStatus.Confirmed(
+                        txid = Txid(incoming.txid),
+                        blockHeight = incoming.blockHeight,
+                    )
+                AppLogger.info(TAG, "Charge ${charge.id} confirmed at block ${incoming.blockHeight}")
+                true
+            }
+            else -> {
+                flow.value = ChargeStatus.Detected(Txid(incoming.txid))
+                false
+            }
         }
     }
 

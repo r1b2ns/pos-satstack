@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
@@ -126,6 +127,16 @@ fun AppNavGraph(navController: NavHostController) {
                     },
                     actions = {
                         if (isChargeRoute) {
+                            IconButton(onClick = {
+                                navController.navigate(AppDestination.WalletTransactions) {
+                                    launchSingleTop = true
+                                }
+                            }) {
+                                Icon(
+                                    imageVector = Icons.Default.History,
+                                    contentDescription = stringResource(R.string.wallet_transactions),
+                                )
+                            }
                             IconButton(onClick = {
                                 navController.navigate(AppDestination.Settings) {
                                     launchSingleTop = true

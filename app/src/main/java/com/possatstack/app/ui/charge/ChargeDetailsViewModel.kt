@@ -5,6 +5,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.toRoute
 import com.possatstack.app.navigation.AppDestination
+import com.possatstack.app.wallet.OnChainWalletEngine
+import com.possatstack.app.wallet.WalletNetwork
 import com.possatstack.app.wallet.payment.Charge
 import com.possatstack.app.wallet.payment.ChargeStatus
 import com.possatstack.app.wallet.payment.PaymentOrchestrator
@@ -27,11 +29,14 @@ class ChargeDetailsViewModel
     @Inject
     constructor(
         private val orchestrator: PaymentOrchestrator,
+        private val walletEngine: OnChainWalletEngine,
         savedStateHandle: SavedStateHandle,
     ) : ViewModel() {
         data class State(
             val charge: Charge? = null,
             val status: ChargeStatus = ChargeStatus.Pending,
+            val network: WalletNetwork? = null,
+            val isRefreshing: Boolean = false,
         )
 
         private val chargeId: String =
@@ -42,6 +47,10 @@ class ChargeDetailsViewModel
 
         init {
             viewModelScope.launch {
+                val network = runCatching { walletEngine.getNetwork() }.getOrNull()
+                _state.update { it.copy(network = network) }
+            }
+            viewModelScope.launch {
                 orchestrator.chargeStatus(chargeId).collect { status ->
                     _state.update { it.copy(status = status) }
                 }
@@ -50,5 +59,17 @@ class ChargeDetailsViewModel
 
         fun cancel() {
             viewModelScope.launch { orchestrator.cancelCharge(chargeId) }
+        }
+
+        fun refresh() {
+            if (_state.value.isRefreshing) return
+            viewModelScope.launch {
+                _state.update { it.copy(isRefreshing = true) }
+                try {
+                    orchestrator.refreshCharge(chargeId)
+                } finally {
+                    _state.update { it.copy(isRefreshing = false) }
+                }
+            }
         }
     }

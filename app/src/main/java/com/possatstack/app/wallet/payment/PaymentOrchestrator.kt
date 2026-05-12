@@ -43,6 +43,12 @@ interface PaymentOrchestrator {
      */
     suspend fun cancelCharge(chargeId: String)
 
+    /**
+     * Force an immediate sync + status check for [chargeId] (instead of
+     * waiting for the next monitor poll). Safe to call on unknown ids (no-op).
+     */
+    suspend fun refreshCharge(chargeId: String)
+
     /** Retrieve the [Charge] record by id, or null if unknown/cancelled. */
     fun getCharge(chargeId: String): Charge?
 }
