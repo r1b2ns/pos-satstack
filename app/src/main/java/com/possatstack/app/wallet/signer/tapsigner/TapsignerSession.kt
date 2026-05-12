@@ -7,27 +7,23 @@ import com.possatstack.app.wallet.signer.SigningContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import java.security.SecureRandom
+import org.bitcoindevkit.cktap.CardException
+import org.bitcoindevkit.cktap.CkTapCard
+import org.bitcoindevkit.cktap.CkTapException
+import org.bitcoindevkit.cktap.SignPsbtException
+import org.bitcoindevkit.cktap.toCktap
 
 /**
- * Drives a single TAPSIGNER interaction from the CVC prompt through the
- * ECDH handshake and PSBT signing. Exposes progress as
- * [TapsignerStep] values for the UI dialog.
+ * Drives a single TAPSIGNER interaction: identifies the tapped card via
+ * `cktap-android`, validates the kind, and delegates PSBT signing to the
+ * `TapSigner.signPsbt` UniFFI call. Exposes progress as [TapsignerStep]
+ * values so the UI dialog can render the right step.
  *
- * The session does not own NFC resources directly — it receives a
- * [TapsignerClient] from a [NfcSessionLauncher] and is responsible for
- * cleaning up by calling [TapsignerClient.close] when it finishes.
- *
- * The PSBT signing pipeline (input digest extraction, signature assembly
- * back into the PSBT) is intentionally bounded by the
- * [TapsignerCrypto] interface — see the companion notes. Until the
- * secp256k1 wiring lands, [run] will fail at the handshake step with
- * [TapsignerError.HostError] and surface that through [state].
+ * All ECDH/secp256k1 work happens inside the Rust `cktap-ffi` crate —
+ * this class only orchestrates the Kotlin side (CVC conversion, step
+ * transitions, error mapping, resource cleanup).
  */
-internal class TapsignerSession(
-    private val crypto: TapsignerCrypto,
-    private val random: SecureRandom = SecureRandom(),
-) {
+internal class TapsignerSession {
     private val stateFlow: MutableStateFlow<TapsignerStep> =
         MutableStateFlow(TapsignerStep.AwaitingCvc)
 
@@ -35,69 +31,98 @@ internal class TapsignerSession(
 
     fun currentStep(): TapsignerStep = stateFlow.value
 
-    /** Update the observable state; used by the UI dialog + signer. */
     fun advance(step: TapsignerStep) {
         stateFlow.value = step
     }
 
     /**
-     * Drive the full sign flow. The caller supplies the CVC (already
-     * validated) and a freshly-connected [TapsignerClient].
+     * Run the full sign flow. The caller supplies the [Cvc] (already
+     * validated) and a connected [transport]. The transport is closed and
+     * the card disposed before this returns, regardless of outcome.
      */
+    @Suppress("UNUSED_PARAMETER")
     suspend fun run(
-        client: TapsignerClient,
+        transport: IsoDepCkTransport,
         cvc: Cvc,
         psbt: UnsignedPsbt,
         context: SigningContext,
     ): SignedPsbt {
+        var card: CkTapCard? = null
+        var cvcString: String? = null
         try {
             advance(TapsignerStep.Exchanging)
 
-            val statusMap = client.send(TapsignerCommand.Status())
-            val status = TapsignerResponse.parseStatus(statusMap)
-            AppLogger.info(
-                TAG,
-                "TAPSIGNER status proto=${status.proto} slots=${status.slots} testnet=${status.isTestnet}",
-            )
-            val cardPubkey =
-                status.cardPubkey
-                    ?: throw TapsignerError.ProtocolError("status did not include card pubkey")
+            card =
+                try {
+                    toCktap(transport)
+                } catch (exception: CkTapException) {
+                    throw exception.toTapsignerError()
+                } catch (exception: CardException) {
+                    throw exception.toTapsignerError()
+                }
 
-            val ephemeral = crypto.generateEphemeralKeyPair()
-            val sessionKey = crypto.deriveSharedSecret(ephemeral.privateKey, cardPubkey)
+            val tapSigner =
+                (card as? CkTapCard.TapSigner)?.v1
+                    ?: throw TapsignerError.NotATapsigner
 
-            val hostNonce = ByteArray(HOST_NONCE_LENGTH).also { random.nextBytes(it) }
-            val xcvc =
-                crypto.encryptCvc(
-                    cvc = cvc,
-                    cardNonce = status.cardNonce,
-                    ourNonce = hostNonce,
-                    sessionKey = sessionKey,
-                )
+            cvcString = String(cvc.asBytes(), Charsets.US_ASCII)
 
-            // NOTE: the PSBT → per-input digest → sign → reinject-signature pipeline
-            // belongs here. It depends on the signing context ([context.recipients],
-            // [context.network], [context.changeAddress]) to cross-check each input
-            // against what the user approved, and on [TapsignerCrypto.verifyCardSignature]
-            // to validate each returned signature before splicing it back into the
-            // PSBT. That wiring is the hardware-QA follow-up tracked in docs/phase-5.md.
-            throw TapsignerError.HostError(
-                "TAPSIGNER sign pipeline requires hardware-QA follow-up (see docs/phase-5.md)",
-            )
+            val signed =
+                try {
+                    tapSigner.signPsbt(psbt.base64, cvcString)
+                } catch (exception: SignPsbtException) {
+                    throw exception.toTapsignerError()
+                } catch (exception: CardException) {
+                    throw exception.toTapsignerError()
+                } catch (exception: CkTapException) {
+                    throw exception.toTapsignerError()
+                }
+
+            return SignedPsbt(signed)
         } catch (error: TapsignerError) {
             advance(TapsignerStep.Failed(error))
             throw error
         } finally {
+            cvcString?.toByteArray(Charsets.US_ASCII)?.fill(0)
             try {
-                client.close()
+                card?.destroy()
             } catch (exception: Exception) {
-                AppLogger.warning(TAG, "client close raised: ${exception.message}")
+                AppLogger.warning(TAG, "card destroy raised: ${exception.message}")
+            }
+            try {
+                transport.close()
+            } catch (exception: Exception) {
+                AppLogger.warning(TAG, "transport close raised: ${exception.message}")
             }
         }
     }
 
     private companion object {
         const val TAG = "TapsignerSession"
-        const val HOST_NONCE_LENGTH = 16
     }
 }
+
+private fun CardException.toTapsignerError(): TapsignerError =
+    when (this) {
+        is CardException.BadAuth -> TapsignerError.WrongCvc(attemptsLeft = null)
+        is CardException.NeedsAuth -> TapsignerError.WrongCvc(attemptsLeft = null)
+        is CardException.RateLimited -> TapsignerError.RateLimited(waitSeconds = 0)
+        is CardException.InvalidState -> TapsignerError.NotSetUp
+        else -> TapsignerError.ProtocolError(this::class.simpleName ?: "CardException", this)
+    }
+
+private fun CkTapException.toTapsignerError(): TapsignerError =
+    when (this) {
+        is CkTapException.Card -> TapsignerError.ProtocolError("Card error", this)
+        is CkTapException.CborDe -> TapsignerError.ProtocolError("CBOR decode", this)
+        is CkTapException.CborValue -> TapsignerError.ProtocolError("CBOR value", this)
+        is CkTapException.Transport -> TapsignerError.CardRemoved
+        is CkTapException.UnknownCardType -> TapsignerError.NotATapsigner
+        else -> TapsignerError.ProtocolError(this::class.simpleName ?: "CkTapException", this)
+    }
+
+private fun SignPsbtException.toTapsignerError(): TapsignerError =
+    when (this) {
+        is SignPsbtException.CkTap -> TapsignerError.ProtocolError("CkTap sign error", this)
+        else -> TapsignerError.ProtocolError(this::class.simpleName ?: "SignPsbtException", this)
+    }

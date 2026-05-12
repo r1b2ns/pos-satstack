@@ -15,13 +15,10 @@ import com.possatstack.app.wallet.signer.SignerSecretStore
 import com.possatstack.app.wallet.signer.TapsignerNfcSigner
 import com.possatstack.app.wallet.signer.tapsigner.AndroidNfcSessionLauncher
 import com.possatstack.app.wallet.signer.tapsigner.NfcSessionLauncher
-import com.possatstack.app.wallet.signer.tapsigner.TapsignerCrypto
-import com.possatstack.app.wallet.signer.tapsigner.UnavailableTapsignerCrypto
 import com.possatstack.app.wallet.storage.SecureWalletStorage
 import com.possatstack.app.wallet.storage.WalletStorage
 import dagger.Binds
 import dagger.Module
-import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import dagger.multibindings.IntoSet
@@ -119,16 +116,4 @@ abstract class WalletModule {
     @Binds
     @Singleton
     abstract fun bindPaymentOrchestrator(impl: DefaultPaymentOrchestrator): PaymentOrchestrator
-
-    companion object {
-        /**
-         * secp256k1 crypto backing the TAPSIGNER ECDH handshake. Shipped as a
-         * placeholder that fails loudly at the handshake step — swap for a
-         * real secp256k1-backed impl during the hardware-QA pass (see
-         * docs/phase-5.md).
-         */
-        @Provides
-        @Singleton
-        internal fun provideTapsignerCrypto(): TapsignerCrypto = UnavailableTapsignerCrypto()
-    }
 }

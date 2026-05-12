@@ -82,6 +82,9 @@ dependencies {
     // o swap vive em WalletModule.@Binds + CHAIN_BACKEND em defaultConfig.
     implementation(libs.bdk.android)
     // implementation(libs.floresta)    // ao trocar para Floresta
+    // Rust-cktap UniFFI bindings — TAPSIGNER / SATSCARD signing via NFC.
+    // Snapshot publicada em ~/.m2 via `just publish-local` em ../rust-cktap/cktap-android.
+    implementation(libs.cktap.android)
     implementation(libs.zxing.core)
     implementation(libs.androidx.camera.core)
     implementation(libs.androidx.camera.camera2)

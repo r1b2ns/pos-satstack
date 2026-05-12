@@ -5,27 +5,29 @@ import android.nfc.tech.IsoDep
 import com.possatstack.app.util.AppLogger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.bitcoindevkit.cktap.CkTransport
 
 /**
- * [TapsignerClient] backed by [IsoDep].
+ * [CkTransport] implementation backed by Android's [IsoDep]. Hands raw
+ * APDUs to a Coinkite Tap card and returns the response, blocking I/O on
+ * [Dispatchers.IO] so callers can suspend without freezing the UI thread.
  *
- * Opens the NFC channel, runs `SELECT AID`, and exposes raw APDU
- * transceive. Timeouts are configured conservatively (5 seconds per APDU)
- * to surface [TapsignerError.Timeout] quickly when the card slips out of
- * range mid-exchange.
+ * Constructed from the [Tag] delivered by [NfcSessionLauncher]. [connect]
+ * MUST be called before the first [transmitApdu]; otherwise APDU dispatch
+ * fails. [close] releases the channel; subsequent transmits throw.
  *
- * Not thread-safe — callers must serialise access (the signer does so via
- * a per-session coroutine).
+ * Not thread-safe — callers must serialise access (the signer session does
+ * this naturally via a single coroutine).
  */
-internal class IsoDepTapsignerClient(
+internal class IsoDepCkTransport(
     private val tag: Tag,
-) : TapsignerClient {
+) : CkTransport {
     private var isoDep: IsoDep? = null
 
-    override val isConnected: Boolean
+    val isConnected: Boolean
         get() = isoDep?.isConnected == true
 
-    override suspend fun connect() =
+    suspend fun connect() =
         withContext(Dispatchers.IO) {
             val channel =
                 IsoDep.get(tag)
@@ -37,34 +39,21 @@ internal class IsoDepTapsignerClient(
                 throw TapsignerError.HostError("IsoDep connect failed", exception)
             }
             isoDep = channel
-
-            val selectResponse =
-                try {
-                    channel.transceive(TapsignerApdus.buildSelectAid())
-                } catch (exception: Exception) {
-                    throw TapsignerError.HostError("SELECT AID transceive failed", exception)
-                }
-
-            val parsedSelect = TapsignerApdus.parseResponse(selectResponse)
-            if (!parsedSelect.isOk) {
-                AppLogger.warning(TAG, "SELECT AID returned sw=0x${Integer.toHexString(parsedSelect.sw)}")
-                throw TapsignerError.NotATapsigner
-            }
         }
 
-    override suspend fun transceive(apdu: ByteArray): ByteArray =
+    override suspend fun transmitApdu(commandApdu: ByteArray): ByteArray =
         withContext(Dispatchers.IO) {
             val channel =
                 isoDep
-                    ?: throw TapsignerError.HostError("transceive before connect")
+                    ?: throw TapsignerError.HostError("transmitApdu before connect")
             try {
-                channel.transceive(apdu)
+                channel.transceive(commandApdu)
             } catch (exception: Exception) {
                 throw TapsignerError.HostError("APDU transceive failed", exception)
             }
         }
 
-    override suspend fun close() {
+    suspend fun close() {
         withContext(Dispatchers.IO) {
             try {
                 isoDep?.close()
@@ -77,7 +66,9 @@ internal class IsoDepTapsignerClient(
     }
 
     private companion object {
-        const val TAG = "IsoDepTapsignerClient"
+        const val TAG = "IsoDepCkTransport"
+
+        /** Conservative per-APDU timeout — surfaces card-lost errors fast. */
         const val TRANSCEIVE_TIMEOUT_MS = 5_000
     }
 }

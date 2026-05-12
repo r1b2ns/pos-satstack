@@ -6,7 +6,6 @@ import com.possatstack.app.wallet.UnsignedPsbt
 import com.possatstack.app.wallet.WalletError
 import com.possatstack.app.wallet.signer.tapsigner.Cvc
 import com.possatstack.app.wallet.signer.tapsigner.NfcSessionLauncher
-import com.possatstack.app.wallet.signer.tapsigner.TapsignerCrypto
 import com.possatstack.app.wallet.signer.tapsigner.TapsignerError
 import com.possatstack.app.wallet.signer.tapsigner.TapsignerSession
 import com.possatstack.app.wallet.signer.tapsigner.TapsignerStep
@@ -35,7 +34,6 @@ class TapsignerNfcSigner
     @Inject
     internal constructor(
         private val launcher: NfcSessionLauncher,
-        private val crypto: TapsignerCrypto,
     ) : Signer {
         override val id: String = "tapsigner"
         override val kind: SignerKind = SignerKind.TAPSIGNER_NFC
@@ -74,7 +72,7 @@ class TapsignerNfcSigner
             context: SigningContext,
         ): SignedPsbt =
             mutex.withLock {
-                val session = TapsignerSession(crypto)
+                val session = TapsignerSession()
                 currentSession = session
 
                 val cvcDeferred = CompletableDeferred<Cvc>()
@@ -97,10 +95,10 @@ class TapsignerNfcSigner
                         }
 
                     publish(session, TapsignerStep.AwaitingTap)
-                    val client = launcher.awaitClient()
+                    val transport = launcher.awaitTransport()
 
                     publish(session, TapsignerStep.Exchanging)
-                    val signed = session.run(client, cvc, psbt, context)
+                    val signed = session.run(transport, cvc, psbt, context)
                     cvc.wipe()
 
                     publish(session, TapsignerStep.Done(signed))
