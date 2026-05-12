@@ -2,6 +2,7 @@ package com.possatstack.app.wallet.payment
 
 import com.possatstack.app.wallet.BitcoinAddress
 import com.possatstack.app.wallet.Txid
+import com.possatstack.app.wallet.UnsignedPsbt
 
 /**
  * A single charge created by the merchant. Immutable once generated.
@@ -14,6 +15,7 @@ data class Charge(
     val memo: String?,
     val payload: ChargePayload,
     val createdAtEpochMs: Long,
+    val unsignedPsbt: UnsignedPsbt? = null,
 )
 
 /**

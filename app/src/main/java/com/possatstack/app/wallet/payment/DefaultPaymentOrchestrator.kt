@@ -1,7 +1,9 @@
 package com.possatstack.app.wallet.payment
 
 import com.possatstack.app.util.AppLogger
+import com.possatstack.app.wallet.FeePolicy
 import com.possatstack.app.wallet.OnChainWalletEngine
+import com.possatstack.app.wallet.PsbtRecipient
 import com.possatstack.app.wallet.Txid
 import com.possatstack.app.wallet.WalletError
 import kotlinx.coroutines.CoroutineScope
@@ -111,6 +113,16 @@ class DefaultPaymentOrchestrator internal constructor(
                 .map { it.txid }
                 .toSet()
 
+        val unsignedPsbt =
+            runCatching {
+                engine.createUnsignedPsbt(
+                    recipients = listOf(PsbtRecipient(address = address, amountSats = amountSats)),
+                    feePolicy = FeePolicy.TargetBlocks(EXPERIMENT_FEE_TARGET_BLOCKS),
+                )
+            }.onFailure { exception ->
+                AppLogger.info(TAG, "Unsigned PSBT generation failed: ${exception.message}")
+            }.getOrNull()
+
         val id = UUID.randomUUID().toString()
         val charge =
             Charge(
@@ -124,6 +136,7 @@ class DefaultPaymentOrchestrator internal constructor(
                         bip21Uri = Bip21.build(address, amountSats, memo),
                     ),
                 createdAtEpochMs = System.currentTimeMillis(),
+                unsignedPsbt = unsignedPsbt,
             )
 
         charges[id] = charge
@@ -202,5 +215,6 @@ class DefaultPaymentOrchestrator internal constructor(
     private companion object {
         const val TAG = "PaymentOrchestrator"
         const val DEFAULT_POLL_INTERVAL_MS = 15_000L
+        const val EXPERIMENT_FEE_TARGET_BLOCKS = 6
     }
 }

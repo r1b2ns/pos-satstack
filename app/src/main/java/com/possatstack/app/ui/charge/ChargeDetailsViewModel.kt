@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.navigation.toRoute
 import com.possatstack.app.navigation.AppDestination
 import com.possatstack.app.wallet.OnChainWalletEngine
+import com.possatstack.app.wallet.UnsignedPsbt
 import com.possatstack.app.wallet.WalletNetwork
 import com.possatstack.app.wallet.payment.Charge
 import com.possatstack.app.wallet.payment.ChargeStatus
@@ -37,12 +38,18 @@ class ChargeDetailsViewModel
             val status: ChargeStatus = ChargeStatus.Pending,
             val network: WalletNetwork? = null,
             val isRefreshing: Boolean = false,
+            val unsignedPsbt: UnsignedPsbt? = null,
         )
 
         private val chargeId: String =
             savedStateHandle.toRoute<AppDestination.ChargeDetails>().chargeId
 
-        private val _state = MutableStateFlow(State(charge = orchestrator.getCharge(chargeId)))
+        private val _state =
+            MutableStateFlow(
+                orchestrator.getCharge(chargeId).let { charge ->
+                    State(charge = charge, unsignedPsbt = charge?.unsignedPsbt)
+                },
+            )
         val state: StateFlow<State> = _state.asStateFlow()
 
         init {
