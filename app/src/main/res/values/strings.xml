@@ -27,6 +27,21 @@
     <string name="charge_status_expired">Charge expired</string>
     <string name="charge_status_failed">Payment tracking failed</string>
 
+    <!-- Charge details: tap-to-pay with TAPSIGNER -->
+    <string name="charge_tappay_button">Pay with TAPSIGNER</string>
+    <string name="charge_tappay_cvc_title">Enter TAPSIGNER CVC</string>
+    <string name="charge_tappay_cvc_hint">CVC (6 chars on the back of the card)</string>
+    <string name="charge_tappay_cvc_continue">Continue</string>
+    <string name="charge_tappay_awaiting_tap_title">Tap your TAPSIGNER</string>
+    <string name="charge_tappay_awaiting_tap_message">Hold the card flat against the back of the phone.</string>
+    <string name="charge_tappay_step_reading">Reading card…</string>
+    <string name="charge_tappay_step_building">Building transaction…</string>
+    <string name="charge_tappay_step_signing">Signing on card…</string>
+    <string name="charge_tappay_step_broadcasting">Broadcasting…</string>
+    <string name="charge_tappay_success_title">Payment sent</string>
+    <string name="charge_tappay_success_message">The transaction has been broadcast to the network.</string>
+    <string name="charge_tappay_failed_title">Payment failed</string>
+
     <!-- Common -->
     <string name="back">Back</string>
     <string name="coming_soon">Coming soon</string>

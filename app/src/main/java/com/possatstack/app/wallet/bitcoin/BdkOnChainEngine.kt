@@ -337,6 +337,77 @@ class BdkOnChainEngine
                 }
             }
 
+        override suspend fun buildPsbtFromExternalSigner(
+            accountXpub: String,
+            masterFingerprint: String,
+            accountDerivationPath: String,
+            network: WalletNetwork,
+            recipient: PsbtRecipient,
+            feePolicy: FeePolicy,
+        ): UnsignedPsbt =
+            withContext(Dispatchers.IO) {
+                require(masterFingerprint.length == EXTERNAL_FINGERPRINT_HEX_LENGTH) {
+                    "masterFingerprint must be $EXTERNAL_FINGERPRINT_HEX_LENGTH hex chars " +
+                        "(got ${masterFingerprint.length})"
+                }
+                val bdkNetwork = network.toBdkNetwork()
+                val keyOrigin = "$masterFingerprint/$accountDerivationPath"
+                val externalDesc = "wpkh([$keyOrigin]$accountXpub/0/*)"
+                val internalDesc = "wpkh([$keyOrigin]$accountXpub/1/*)"
+
+                AppLogger.info(
+                    TAG,
+                    "External-signer PSBT build: network=$network, account=$keyOrigin, " +
+                        "recipient=${recipient.address.value}, amount=${recipient.amountSats}",
+                )
+
+                val tempDb =
+                    File.createTempFile(EXTERNAL_SIGNER_DB_PREFIX, EXTERNAL_SIGNER_DB_SUFFIX, dbDir)
+                val transientPersister =
+                    try {
+                        Persister.newSqlite(tempDb.absolutePath)
+                    } catch (exception: Exception) {
+                        tempDb.delete()
+                        throw exception.toWalletError()
+                    }
+
+                try {
+                    val transientWallet =
+                        try {
+                            Wallet(
+                                descriptor = Descriptor(externalDesc, bdkNetwork),
+                                changeDescriptor = Descriptor(internalDesc, bdkNetwork),
+                                network = bdkNetwork,
+                                persister = transientPersister,
+                            )
+                        } catch (exception: Exception) {
+                            throw exception.toWalletError()
+                        }
+
+                    chainSyncProvider.sync(
+                        wallet = transientWallet,
+                        network = network,
+                        fullScan = true,
+                        onProgress = {},
+                    )
+
+                    try {
+                        val bdkAddress = Address(recipient.address.value, bdkNetwork)
+                        val amount = Amount.fromSat(recipient.amountSats.toULong())
+                        val builder =
+                            TxBuilder()
+                                .addRecipient(bdkAddress.scriptPubkey(), amount)
+                                .applyFee(feePolicy)
+                        val psbt = builder.finish(transientWallet)
+                        UnsignedPsbt(base64 = psbt.serialize(), fingerprint = masterFingerprint)
+                    } catch (exception: Exception) {
+                        throw exception.toWalletError()
+                    }
+                } finally {
+                    tempDb.delete()
+                }
+            }
+
         override suspend fun bumpFee(
             txid: Txid,
             newPolicy: FeePolicy,
@@ -536,5 +607,8 @@ class BdkOnChainEngine
         private companion object {
             const val TAG = "BdkOnChainEngine"
             const val DB_FILE_NAME = "bdk_wallet.sqlite3"
+            const val EXTERNAL_FINGERPRINT_HEX_LENGTH = 8
+            const val EXTERNAL_SIGNER_DB_PREFIX = "ext-signer-"
+            const val EXTERNAL_SIGNER_DB_SUFFIX = ".sqlite3"
         }
     }

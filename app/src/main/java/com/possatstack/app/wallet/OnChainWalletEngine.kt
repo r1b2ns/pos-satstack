@@ -92,6 +92,37 @@ interface OnChainWalletEngine {
         newPolicy: FeePolicy,
     ): UnsignedPsbt
 
+    /**
+     * Build an unsigned PSBT that spends from a **foreign** BIP-84 xpub
+     * (e.g., a TAPSIGNER held by the customer) into [recipient]. The loaded
+     * merchant wallet is not used — a transient watch-only BDK wallet is
+     * created from the descriptors below, synced once, and used solely to
+     * build the transaction.
+     *
+     * The descriptors registered with BDK are:
+     *   - receive: `wpkh([fp/path]xpub/0/&#42;)`
+     *   - change:  `wpkh([fp/path]xpub/1/&#42;)`
+     *
+     * BDK fills `bip32_derivation` on every input so the external signer
+     * (TAPSIGNER) can find its key and produce the signature.
+     *
+     * @param accountXpub xpub at the BIP-84 account level (depth 3).
+     * @param masterFingerprint 8 hex chars of the external master key.
+     * @param accountDerivationPath BIP-84 path from master to the account
+     *        xpub, e.g. `"84'/0'/0'"` (no leading `m/`).
+     * @param network the network of the external signer (must match
+     *        [recipient]'s network — otherwise BDK rejects the build).
+     * @throws com.possatstack.app.wallet.WalletError on sync / build failure.
+     */
+    suspend fun buildPsbtFromExternalSigner(
+        accountXpub: String,
+        masterFingerprint: String,
+        accountDerivationPath: String,
+        network: WalletNetwork,
+        recipient: PsbtRecipient,
+        feePolicy: FeePolicy,
+    ): UnsignedPsbt
+
     // ─────────────────────────────────────────────────────────────────
     //  Fees
     // ─────────────────────────────────────────────────────────────────

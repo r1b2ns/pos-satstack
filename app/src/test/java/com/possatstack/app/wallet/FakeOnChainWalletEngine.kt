@@ -22,6 +22,7 @@ class FakeOnChainWalletEngine : OnChainWalletEngine {
     var createPsbtResult: Result<UnsignedPsbt> = Result.success(UnsignedPsbt("cHNidP//", "fp"))
     var broadcastResult: Result<Txid> = Result.success(Txid("abcd" + "0".repeat(60)))
     var bumpFeeResult: Result<UnsignedPsbt> = Result.success(UnsignedPsbt("cHNidP//bump", "fp"))
+    var externalSignerPsbtResult: Result<UnsignedPsbt> = Result.success(UnsignedPsbt("cHNidP//ext", "extfp"))
     var estimateFeesResult: Result<FeeEstimate> = Result.success(FeeEstimate(5.0, 6))
 
     var balanceResult: Result<Balance> = Result.success(Balance(0, 0, 0))
@@ -41,6 +42,8 @@ class FakeOnChainWalletEngine : OnChainWalletEngine {
     var createPsbtCount = 0
     var broadcastCount = 0
     var bumpFeeCount = 0
+    var externalSignerPsbtCount = 0
+    val externalSignerCalls = mutableListOf<ExternalSignerCall>()
     var estimateFeesCount = 0
     var balanceCount = 0
     var transactionsCount = 0
@@ -115,6 +118,27 @@ class FakeOnChainWalletEngine : OnChainWalletEngine {
         return bumpFeeResult.getOrThrow()
     }
 
+    override suspend fun buildPsbtFromExternalSigner(
+        accountXpub: String,
+        masterFingerprint: String,
+        accountDerivationPath: String,
+        network: WalletNetwork,
+        recipient: PsbtRecipient,
+        feePolicy: FeePolicy,
+    ): UnsignedPsbt {
+        externalSignerPsbtCount++
+        externalSignerCalls +=
+            ExternalSignerCall(
+                accountXpub,
+                masterFingerprint,
+                accountDerivationPath,
+                network,
+                recipient,
+                feePolicy,
+            )
+        return externalSignerPsbtResult.getOrThrow()
+    }
+
     override suspend fun estimateFees(target: FeeTarget): FeeEstimate {
         estimateFeesCount++
         return estimateFeesResult.getOrThrow()
@@ -140,6 +164,15 @@ class FakeOnChainWalletEngine : OnChainWalletEngine {
         syncProgressReporter = onProgress
         syncResult.getOrThrow()
     }
+
+    data class ExternalSignerCall(
+        val accountXpub: String,
+        val masterFingerprint: String,
+        val accountDerivationPath: String,
+        val network: WalletNetwork,
+        val recipient: PsbtRecipient,
+        val feePolicy: FeePolicy,
+    )
 
     companion object {
         const val DEFAULT_MNEMONIC =

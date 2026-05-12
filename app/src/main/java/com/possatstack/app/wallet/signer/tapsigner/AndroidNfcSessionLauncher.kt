@@ -30,6 +30,13 @@ internal class AndroidNfcSessionLauncher
         private var pending: CompletableDeferred<Tag>? = null
 
         override suspend fun awaitClient(timeoutMs: Long): TapsignerClient {
+            val tag = awaitTag(timeoutMs)
+            val client = IsoDepTapsignerClient(tag)
+            client.connect()
+            return client
+        }
+
+        override suspend fun awaitTag(timeoutMs: Long): Tag {
             val activity =
                 activityHolder.current()
                     ?: throw TapsignerError.HostError("No activity available for NFC reader mode")
@@ -57,10 +64,7 @@ internal class AndroidNfcSessionLauncher
             )
 
             try {
-                val tag = withTimeout(timeoutMs) { deferred.await() }
-                val client = IsoDepTapsignerClient(tag)
-                client.connect()
-                return client
+                return withTimeout(timeoutMs) { deferred.await() }
             } catch (exception: TimeoutCancellationException) {
                 throw TapsignerError.Timeout
             } finally {

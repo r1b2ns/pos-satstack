@@ -82,6 +82,10 @@ dependencies {
     // o swap vive em WalletModule.@Binds + CHAIN_BACKEND em defaultConfig.
     implementation(libs.bdk.android)
     // implementation(libs.floresta)    // ao trocar para Floresta
+    // rust-cktap (Coinkite tap-protocol) bindings — used by the TAPSIGNER
+    // NFC pay-to-charge flow. Consumed from mavenLocal while the upstream
+    // artifact is pre-release.
+    implementation(libs.cktap.android)
     implementation(libs.zxing.core)
     implementation(libs.androidx.camera.core)
     implementation(libs.androidx.camera.camera2)

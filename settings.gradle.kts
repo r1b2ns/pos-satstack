@@ -15,6 +15,10 @@ pluginManagement {
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
+        // cktap-android is consumed from the local Maven cache while the
+        // upstream library is still pre-release. Drop this once the artifact
+        // is published to Maven Central.
+        mavenLocal()
         google()
         mavenCentral()
     }

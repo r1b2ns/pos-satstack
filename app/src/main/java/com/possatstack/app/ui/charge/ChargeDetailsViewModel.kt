@@ -9,8 +9,11 @@ import com.possatstack.app.wallet.OnChainWalletEngine
 import com.possatstack.app.wallet.UnsignedPsbt
 import com.possatstack.app.wallet.WalletNetwork
 import com.possatstack.app.wallet.payment.Charge
+import com.possatstack.app.wallet.payment.ChargePayload
 import com.possatstack.app.wallet.payment.ChargeStatus
 import com.possatstack.app.wallet.payment.PaymentOrchestrator
+import com.possatstack.app.wallet.payment.TapToPayController
+import com.possatstack.app.wallet.payment.TapToPayState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -28,9 +31,10 @@ import javax.inject.Inject
 @HiltViewModel
 class ChargeDetailsViewModel
     @Inject
-    constructor(
+    internal constructor(
         private val orchestrator: PaymentOrchestrator,
         private val walletEngine: OnChainWalletEngine,
+        private val tapToPayController: TapToPayController,
         savedStateHandle: SavedStateHandle,
     ) : ViewModel() {
         data class State(
@@ -51,6 +55,8 @@ class ChargeDetailsViewModel
                 },
             )
         val state: StateFlow<State> = _state.asStateFlow()
+
+        val tapToPayState: StateFlow<TapToPayState> = tapToPayController.state
 
         init {
             viewModelScope.launch {
@@ -78,5 +84,33 @@ class ChargeDetailsViewModel
                     _state.update { it.copy(isRefreshing = false) }
                 }
             }
+        }
+
+        /**
+         * Kick off the TAPSIGNER tap-to-pay flow for this charge. No-op if
+         * the charge has no on-chain payload or the wallet network is not
+         * loaded yet.
+         */
+        fun startTapToPay() {
+            val charge = _state.value.charge ?: return
+            val network = _state.value.network ?: return
+            val onChain = charge.payload as? ChargePayload.OnChainAddress ?: return
+            tapToPayController.start(
+                chargeAddress = onChain.address,
+                chargeAmountSats = charge.amountSats,
+                network = network,
+            )
+        }
+
+        fun submitTapCvc(cvc: String) {
+            tapToPayController.submitCvc(cvc)
+        }
+
+        fun cancelTapToPay() {
+            tapToPayController.cancel()
+        }
+
+        fun dismissTapToPay() {
+            tapToPayController.reset()
         }
     }

@@ -12,6 +12,7 @@ navigationCompose = "2.8.5"
 ktlint = "12.1.1"
 bdkAndroid = "2.3.1"           # fornece EsploraClient, ElectrumClient e os tipos CBF (CbfBuilder/CbfClient/CbfNode) usados pelo backend Kyoto
 # floresta = "X.Y.Z"           # descomentar ao trocar para Floresta (coord. TBD)
+cktapAndroid = "0.1.0-SNAPSHOT" # Coinkite tap-protocol bindings (rust-cktap) — consumed from mavenLocal until published
 zxingCore = "3.5.3"
 cameraX = "1.4.0"
 securityCrypto = "1.1.0-alpha06"
@@ -36,6 +37,7 @@ androidx-navigation-compose = { group = "androidx.navigation", name = "navigatio
 bdk-android = { group = "org.bitcoindevkit", name = "bdk-android", version.ref = "bdkAndroid" }
 # Alternativas — descomentar apenas uma e trocar o @Binds em WalletModule + CHAIN_BACKEND em build.gradle
 # floresta  = { group = "TBD",               name = "TBD",       version.ref = "floresta" }
+cktap-android = { group = "org.bitcoindevkit", name = "cktap-android", version.ref = "cktapAndroid" }
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinxSerializationJson" }
 hilt-android = { group = "com.google.dagger", name = "hilt-android", version.ref = "hilt" }
 hilt-compiler = { group = "com.google.dagger", name = "hilt-compiler", version.ref = "hilt" }
